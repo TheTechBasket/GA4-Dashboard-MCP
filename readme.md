@@ -1,9 +1,16 @@
-https://developers.google.com/analytics/devguides/reporting/data/v1/quickstart-client-libraries
-https://developers.google.com/analytics/devguides/reporting/data/v1/quotas
+## Steps
 
 
-#all
-https://github.com/googleapis/google-cloud-node
+* Clone repo
+* run `npm install` to install all dependency
+* make sure to not leak secret .json file included in repo
+* and finally run `npm run dev` to access web page on localhost:3000
+![alt text](https://github.com/TheTechBasket/GA4_report/blob/master/screenshot.jpg?raw=true)
 
-#ga4
-https://github.com/googleapis/nodejs-analytics-data
+### Important links
+
+* https://developers.google.com/analytics/devguides/reporting/data/v1/quickstart-client-libraries
+* https://developers.google.com/analytics/devguides/reporting/data/v1/quotas
+
+* https://github.com/googleapis/google-cloud-node
+* https://github.com/googleapis/nodejs-analytics-data
