@@ -1,70 +1,73 @@
+// don't forget to set data to empty array after sending request to client because data is global variable
+let data = [];
+async function loadRealtimeReport({ propertyId, credentialsJsonPath = 'ga4dataapi-3b121924e25d.json', site }) {
 
+    // var propertyId = '302302337';
+    // var credentialsJsonPath = 'ga4dataapi-3b121924e25d.json';
 
-exports.allrealtime = async (req, res) => {
-    const data = [];
+    // Imports the Google Analytics Data API client library.
+    const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 
-try {
-    async function main({propertyId, credentialsJsonPath = 'ga4dataapi-3b121924e25d.json', site}) {
+    // Creates a client.
+    const analyticsDataClient = new BetaAnalyticsDataClient({
+        keyFilename: credentialsJsonPath,
+    });
 
-        // var propertyId = '302302337';
-        // var credentialsJsonPath = 'ga4dataapi-3b121924e25d.json';
+    // Runs a realtime report.
+    async function runRealtimeReport() {
+        const [response] = await analyticsDataClient.runRealtimeReport({
+            // The property parameter value must be in the form `properties/1234`
+            // where `1234` is a GA4 property Id.
+            property: `properties/${propertyId}`,
+              dimensions: [
+                {
+                  name: 'streamName',
+                },
+              ],
+            metrics: [
+                {
+                    name: 'activeUsers',
+                },
 
-        // Imports the Google Analytics Data API client library.
-        const { BetaAnalyticsDataClient } = require('@google-analytics/data');
+                {
+                    name: 'conversions',
+                },
+                {
+                    name: 'eventCount',
+                },
 
-        // Creates a client.
-        const analyticsDataClient = new BetaAnalyticsDataClient({
-            keyFilename: credentialsJsonPath,
+            ],
         });
 
-        // Runs a realtime report.
-        async function runRealtimeReport() {
-            const [response] = await analyticsDataClient.runRealtimeReport({
-                // The property parameter value must be in the form `properties/1234`
-                // where `1234` is a GA4 property Id.
-                property: `properties/${propertyId}`,
-                  dimensions: [
-                    {
-                      name: 'streamName',
-                    },
-                  ],
-                metrics: [
-                    {
-                        name: 'activeUsers',
-                    },
-
-                    {
-                        name: 'conversions',
-                    },
-
-                ],
-            });
-
-            data.push(response);
+        data.push(response);
 
 
-            // console.log('Report result for: ', site);
-            // console.log(response);
-            // response.rows.forEach((row) => {
-            //     console.log(
-            //         row.dimensionValues[0],
-            //         row.metricValues[0],
-            //         row.metricValues[1],
-            //         row.metricValues[2],
-            //     );
-            // });
+        // console.log('Report result for: ', site);
+        // console.log(response);
+        // response.rows.forEach((row) => {
+        //     console.log(
+        //         row.dimensionValues[0],
+        //         row.metricValues[0],
+        //         row.metricValues[1],
+        //         row.metricValues[2],
+        //     );
+        // });
 
 
 
-        }   // end of runRealtimeReport
+    }   // end of runRealtimeReport
 
-        await runRealtimeReport();
+    await runRealtimeReport();
 
 
 
 
-    } // end of main
+} // end of loadRealtimeReport
 
+exports.allrealtime = async (req, res) => {
+
+
+try {
     process.on('unhandledRejection', (err) => {
         console.error(err.message);
         process.exitCode = 1;
@@ -79,17 +82,16 @@ try {
         { id: 257579250, site: "TTB" },
     ];
 
+    // in developement mode we can use this
+    // const properties = [
+    //     { id: 302302337, site: "Quiz Qt" },
+    //     { id: 302302242, site: "BuddeyMeter Qt" },
+    // ];
+
 
     for (let i = 0; i < properties.length; i++) {
-        await main({ propertyId:properties[i].id, site:properties[i].site});
+        await loadRealtimeReport({ propertyId:properties[i].id, site:properties[i].site});
     }
-    // async function getData() {
-    //    await properties.forEach(property => {
-    //         main({ propertyId:property.id, site:property.site});
-    //    })
-    //    console.log(data);
-    // }
-    // getData();
 
 
     res.status(200).render(
@@ -104,8 +106,11 @@ try {
         }
     )
 
+    data = [];
+
 } catch (err) {
     console.log(err.message);
+    res.send(err.message);
 
 }
 
@@ -114,4 +119,44 @@ try {
 
 
 
+}
+
+// selective realtime data request to make faster load of the page
+exports.realtime = async (req, res) => {
+try {
+    let properties = req.query.id;
+    console.log(typeof (properties));
+
+
+    // if single value is passed in query then convert it to array
+    if (typeof(properties) !== 'object') {
+        properties = [properties];
+    }
+
+    // loop over passed properties
+    for (let i = 0; i < properties.length; i++) {
+            await loadRealtimeReport({ propertyId:properties[i]});
+        }
+
+
+
+    res.status(200).render(
+        'home', {
+            data: data,
+            head: {
+                title: 'Home',
+                description: 'game.description',
+                image: `s`, // games featured img url
+                url: `s`,
+            },
+        }
+    )
+
+    data = [];
+} catch (err) {
+    console.log(err.message);
+
+    res.send(err.message);
+
+}
 }
