@@ -32,6 +32,9 @@ const toggle = document.getElementById('refreshToggle');
 toggle.addEventListener('click', () => {
     if (toggle.checked) {
         toggle.checked = true;
+        // imediately reload
+            location.reload();
+
     } else {
         toggle.checked = false;
     }
