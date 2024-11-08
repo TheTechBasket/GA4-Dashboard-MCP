@@ -1,63 +1,23 @@
 {{!-- {{{json_stringify data}}} --}}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4  font-heading my-10 transition-all">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 font-heading my-10 transition-all">
   {{#each data}}
-    <div class="bg-white p-5 shadow shadow-gray-100 rounded-md transition-all">
+    <a href="{{this.dashboardUrl}}" target="_blank" rel="noopener noreferrer"
+       class="block bg-white p-5 shadow shadow-gray-100 rounded-md transition-all hover:shadow-lg">
       <p class="text-xl font-bold text-center">
-        {{this.rows.0.dimensionValues.0.value}}
+        {{this.siteName}}
       </p>
       <div class="grid grid-cols-2 gap-2 p-2">
-      <div>
-        {{#each this.metricHeaders}}
-          <p>
-            {{this.name}}
-          </p>
-        {{/each}}
+        <div>
+          <p>Active Users</p>
+          <p>Page Views</p>
+        </div>
+        <div>
+          <p>{{this.activeUsers}}</p>
+          <p>{{this.pageViews}}</p>
+        </div>
       </div>
-      <div>
-        {{#each this.rows.0.metricValues}}
-          <p>
-            {{this.value}}
-          </p>
-        {{/each}}
-      </div>
-
-
-
-      </div>
-    </div>
+    </a>
   {{/each}}
-  <div class="bg-blue-600 text-white p-5 shadow shadow-blue-100 rounded-md transition-all">
-      <p class="text-xl font-bold text-center">
-        Total
-      </p>
-      <div class="grid grid-cols-2 gap-2 p-2">
-      <div>
-          <p>
-            activeUsers
-          </p>
-          <p>
-            conversions
-          </p>
-          <p>
-            eventCount
-          </p>
-      </div>
-      <div>
-          <p id="totalActiveUsers">
-            ...
-          </p>
-          <p id="totalConversions">
-            ...
-          </p>
-          <p id="totalEventCount">
-            ...
-          </p>
-      </div>
-
-
-
-      </div>
-    </div>
 </div>
 <script>
   const livedata =

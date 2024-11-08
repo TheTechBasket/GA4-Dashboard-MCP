@@ -1,35 +1,20 @@
-// get element by id
-
-const totalActiveUsers = document.getElementById('totalActiveUsers');
-const totalConversions = document.getElementById('totalConversions');
-const totalEventCount = document.getElementById('totalEventCount');
-
-
-// event listner on page load
 window.addEventListener('load', () => {
+    const totalActiveUsers = document.getElementById('totalActiveUsers');
 
-    let ActiveUsers = livedata.reduce(function (previousValue, currentValue) {
-        return previousValue + parseInt(currentValue.rows[0].metricValues[0].value)
+    let activeUsers = livedata?.reduce((total, site) => {
+        return total + parseInt(site.activeUsers || 0);
     }, 0);
-
-    totalActiveUsers.innerText = ActiveUsers;
-    let Conversions = livedata.reduce(function (previousValue, currentValue) {
-        return previousValue + parseInt(currentValue.rows[0].metricValues[1].value)
-    }, 0);
-    totalConversions.innerText = Conversions;
-    let EventCount = livedata.reduce(function (previousValue, currentValue) {
-        return previousValue + parseInt(currentValue.rows[0].metricValues[2].value)
-    }, 0);
-    totalEventCount.innerText = EventCount;
-
+    console.log(activeUsers);
+    // totalActiveUsers.innerText = activeUsers;
 });
+
 
 
 // check toggle button value before running the function
 const toggle = document.getElementById('refreshToggle');
 
 // update the data on toggle button click
-toggle.addEventListener('click', () => {
+toggle?.addEventListener('click', () => {
     if (toggle.checked) {
         toggle.checked = true;
         // imediately reload
@@ -62,16 +47,3 @@ if (toggle.checked) {
     }, reloadDuration);
     console.log(`Page will reload every ${reloadDuration/1000} seconds`);
 }
-
-// check if page is visible or not
-
-// document.addEventListener("visibilitychange", () => {
-//     if (document.hidden) {
-//         console.log('page is hidden');
-//     } else {
-//         console.log('page is visible');
-//     }
-// });
-
-
-

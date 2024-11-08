@@ -1,162 +1,180 @@
-// don't forget to set data to empty array after sending request to client because data is global variable
-let data = [];
-async function loadRealtimeReport({ propertyId, credentialsJsonPath = 'ga4dataapi-3b121924e25d.json', site }) {
+// Function to get all GA4 properties from all accounts
+async function getAnalyticsProperties(credentialsJsonPath) {
+    const { AnalyticsAdminServiceClient } = require('@google-analytics/admin');
+    const analyticsAdmin = new AnalyticsAdminServiceClient({
+        keyFilename: credentialsJsonPath,
+    });
 
-    // var propertyId = '302302337';
-    // var credentialsJsonPath = 'ga4dataapi-3b121924e25d.json';
+    try {
+        // Get all accounts
+        const [accounts] = await analyticsAdmin.listAccounts();
+        if (!accounts || accounts.length === 0) {
+            throw new Error('No accounts found');
+        }
 
-    // Imports the Google Analytics Data API client library.
+        // Get properties for all accounts
+        let allProperties = [];
+        for (const account of accounts) {
+            // console.log(account.name);
+            const [properties] = await analyticsAdmin.listProperties({
+                filter: `parent:${account.name}`,
+                pageSize: 50
+            });
+
+            const formattedProperties = properties.map(property => ({
+                id: property.name.split('/').pop(),
+                site: property.displayName
+            }));
+
+            allProperties = [...allProperties, ...formattedProperties];
+        }
+        // console.log(allProperties);
+        return allProperties;
+    } catch (error) {
+        console.error('Error fetching properties:', error);
+        throw error;
+    }
+}
+
+async function batchRealtimeReport({ properties, credentialsJsonPath = 'ga4dataapi-3b121924e25d.json' }) {
     const { BetaAnalyticsDataClient } = require('@google-analytics/data');
-
-    // Creates a client.
     const analyticsDataClient = new BetaAnalyticsDataClient({
         keyFilename: credentialsJsonPath,
     });
 
-    // Runs a realtime report.
-    async function runRealtimeReport() {
-        const [response] = await analyticsDataClient.runRealtimeReport({
-            // The property parameter value must be in the form `properties/1234`
-            // where `1234` is a GA4 property Id.
-            property: `properties/${propertyId}`,
-              dimensions: [
-                {
-                  name: 'streamName',
-                },
-              ],
-            metrics: [
-                {
-                    name: 'activeUsers',
-                },
+    // Create batch request
+    const batchRequests = properties.map(property => ({
+        property: `properties/${property.id}`,
+        dimensions: [
+            {
+                name: 'streamName',
+            }
+        ],
+        metrics: [
+            {
+                name: 'activeUsers',
+            },
+            {
+                name: 'screenPageViews',
+            }
+        ],
+        minuteRanges: [
+            {
+                startMinutesAgo: 29,
+                endMinutesAgo: 0
+            }
+        ],
+        dimensionFilter: {
+            andGroup: {
+                expressions: [
+                    {
+                        filter: {
+                            fieldName: "platform",
+                            stringFilter: {
+                                matchType: "CONTAINS",
+                                value: ""
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    }));
 
-                {
-                    name: 'conversions',
-                },
-                {
-                    name: 'eventCount',
-                },
+    try {
+        // Execute batch request
+        const responses = await Promise.all(
+            batchRequests.map(async (request, index) => {
+                try {
+                    const [response] = await analyticsDataClient.runRealtimeReport(request);
+                    // console.log('Raw response:', JSON.stringify(response, null, 2)); // Debug log
 
-            ],
-        });
+                    // Handle empty response
+                    if (!response.rows || response.rows.length === 0) {
+                        return {
+                            siteName: properties[index].site,
+                            activeUsers: 0,
+                            pageViews: 0,
+                            dashboardUrl: `https://analytics.google.com/analytics/web/#/p${properties[index].id}/reports/reportinghub`
+                        };
+                    }
 
-        data.push(response);
+                    // Sum up active users across all rows
+                    const totalActiveUsers = response.rows.reduce((sum, row) => {
+                        return sum + parseInt(row.metricValues[0].value || 0);
+                    }, 0);
 
+                    const totalPageViews = response.rows.reduce((sum, row) => {
+                        return sum + parseInt(row.metricValues[1].value || 0);
+                    }, 0);
 
-        // console.log('Report result for: ', site);
-        // console.log(response);
-        // response.rows.forEach((row) => {
-        //     console.log(
-        //         row.dimensionValues[0],
-        //         row.metricValues[0],
-        //         row.metricValues[1],
-        //         row.metricValues[2],
-        //     );
-        // });
+                    return {
+                        siteName: properties[index].site,
+                        activeUsers: totalActiveUsers,
+                        pageViews: totalPageViews,
+                        dashboardUrl: `https://analytics.google.com/analytics/web/#/p${properties[index].id}/reports/reportinghub`
+                    };
+                } catch (error) {
+                    console.error(`Error for property ${properties[index].site}:`, error);
+                    return {
+                        error: true,
+                        siteName: properties[index].site,
+                        activeUsers: 0,
+                        pageViews: 0,
+                        message: error.message,
+                        dashboardUrl: `https://analytics.google.com/analytics/web/#/p${properties[index].id}/reports/reportinghub`
+                    };
+                }
+            })
+        );
 
-
-
-    }   // end of runRealtimeReport
-
-    await runRealtimeReport();
-
-
-
-
-} // end of loadRealtimeReport
+        // console.log('Processed responses:', JSON.stringify(responses, null, 2)); // Debug log
+        return responses;
+    } catch (error) {
+        console.error('Batch request error:', error);
+        throw error;
+    }
+}
 
 exports.allrealtime = async (req, res) => {
+    try {
+        const properties = await getAnalyticsProperties('ga4dataapi-3b121924e25d.json');
 
+        // Get all data in one batch request
+        const batchResponse = await batchRealtimeReport({ properties });
 
-try {
-    process.on('unhandledRejection', (err) => {
-        console.error(err.message);
-        process.exitCode = 1;
-    });
+        // Format the response for frontend
+        const formattedData = batchResponse.map(response => {
+            if (response.error) {
+                return {
+                    siteName: response.siteName,
+                    activeUsers: 0,
+                    pageViews: 0,
+                    error: response.message,
+                    dashboardUrl: response.dashboardUrl
+                };
+            }
 
-    /* delcaring properites we want to check real time users */
-    const properties = [
-        { id: 302560390, site: "Quoted Tale" },
-        { id: 302302337, site: "Quiz Qt" },
-        { id: 302302242, site: "BuddeyMeter Qt" },
-        { id: 302560390, site: "Qt WP" },
-        { id: 257579250, site: "TTB" },
-    ];
+            return {
+                siteName: response.siteName,
+                activeUsers: response.activeUsers,
+                pageViews: response.pageViews,
+                dashboardUrl: response.dashboardUrl
+            };
+        });
 
-    // in developement mode we can use this
-    // const properties = [
-    //     { id: 302302337, site: "Quiz Qt" },
-    //     { id: 302302242, site: "BuddeyMeter Qt" },
-    // ];
-
-
-    for (let i = 0; i < properties.length; i++) {
-        await loadRealtimeReport({ propertyId:properties[i].id, site:properties[i].site});
-    }
-
-
-    res.status(200).render(
-        'home', {
-            data: data,
+        res.status(200).render('home', {
+            data: formattedData,
             head: {
                 title: 'Home',
-                description: 'game.description',
-                image: `s`, // games featured img url
+                description: 'Real-time Analytics Dashboard',
+                image: `s`,
                 url: `s`,
             },
-        }
-    )
+        });
 
-    data = [];
-
-} catch (err) {
-    console.log(err.message);
-    res.send(err.message);
-
-}
-
-
-
-
-
-
-}
-
-// selective realtime data request to make faster load of the page
-exports.realtime = async (req, res) => {
-try {
-    let properties = req.query.id;
-    console.log(typeof (properties));
-
-
-    // if single value is passed in query then convert it to array
-    if (typeof(properties) !== 'object') {
-        properties = [properties];
+    } catch (err) {
+        console.log(err.message);
+        res.status(500).send(err.message);
     }
-
-    // loop over passed properties
-    for (let i = 0; i < properties.length; i++) {
-            await loadRealtimeReport({ propertyId:properties[i]});
-        }
-
-
-
-    res.status(200).render(
-        'home', {
-            data: data,
-            head: {
-                title: 'Home',
-                description: 'game.description',
-                image: `s`, // games featured img url
-                url: `s`,
-            },
-        }
-    )
-
-    data = [];
-} catch (err) {
-    console.log(err.message);
-
-    res.send(err.message);
-
-}
-}
+};
