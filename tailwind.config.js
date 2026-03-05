@@ -4,8 +4,9 @@ module.exports = {
   theme: {
     extend: {},
     fontFamily: {
-      'sans': ['Inter', 'sans-serif'],
-      'heading': ['Poppins', 'sans-serif']
+      'sans': ['Syne', 'system-ui', 'sans-serif'],
+      'heading': ['Syne', 'system-ui', 'sans-serif'],
+      'mono': ['DM Mono', 'Courier New', 'monospace'],
     },
     screens: {
       'sm': '640px',

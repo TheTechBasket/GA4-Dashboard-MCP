@@ -1,3 +1,6 @@
+// Register TypeScript support — must be first, before any .ts file is required
+require('ts-node').register({ transpileOnly: true, files: true });
+
 const express = require('express');
 const exphbs = require('express-handlebars');
 const cors = require('cors');
@@ -62,12 +65,28 @@ https://expressjs.com/en/guide/routing.html
 	- Actual link of routes have prefix used below
 */
 
-
 // for image creation api
 app.use("/", apiroutes);
 
 /* Express Server Listening */
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-	console.log(`app listening at ${port}`)
+	console.log(`app listening at ${port}`);
+
+	// Warm country metadata cache in background (restcountries.com → .cache/countries.json)
+	const { warmCountriesCache } = require('./controllers/countriesCache');
+	warmCountriesCache();
+
+	// Trigger a properties cache refresh on startup when --refresh-cache is passed,
+	// e.g.: node app.js --refresh-cache
+	if (process.argv.includes('--refresh-cache')) {
+		const { refreshPropertiesCache } = require('./controllers/apiController');
+		refreshPropertiesCache()
+			.then((props) =>
+				console.log(`[startup] Cache refreshed: ${props.length} properties`),
+			)
+			.catch((err) =>
+				console.error('[startup] Cache refresh failed:', err.message),
+			);
+	}
 });

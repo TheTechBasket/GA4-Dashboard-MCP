@@ -1,26 +1,834 @@
-{{!-- {{{json_stringify data}}} --}}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 font-heading my-10 transition-all">
-  {{#each data}}
-    <a href="{{this.dashboardUrl}}" target="_blank" rel="noopener noreferrer"
-       class="block bg-white p-5 shadow shadow-gray-100 rounded-md transition-all hover:shadow-lg">
-      <p class="text-xl font-bold text-center">
-        {{this.siteName}}
-      </p>
-      <div class="grid grid-cols-2 gap-2 p-2">
-        <div>
-          <p>Active Users</p>
-          <p>Page Views</p>
+<style>
+  /* ─── Design tokens ──────────────────────────────────────────── */
+  :root {
+    --page-bg: #f5f3ee;
+    --hdr-bg: #18181c;
+    --card-bg: #ffffff;
+    --card-bdr: #e9e5df;
+    --accent: #e8562a;
+    --green: #059669;
+    --amber: #d97706;
+    --danger: #dc2626;
+    --text: #18181c;
+    --muted: #78756f;
+    --xmuted: #aaa89f;
+    --mono: 'DM Mono', 'Courier New', monospace;
+    --sans: 'Syne', system-ui, sans-serif;
+    --radius: 10px;
+    --ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
+    --ease-io: cubic-bezier(0.645, 0.045, 0.355, 1);
+  }
+
+  [data-theme="dark"] {
+    --page-bg: #0f0f14;
+    --hdr-bg: #18181c;
+    --card-bg: #1a1a22;
+    --card-bdr: rgba(255, 255, 255, 0.08);
+    --text: #e4e2dd;
+    --muted: #8a8890;
+    --xmuted: #5a5870;
+  }
+
+  /* ─── Base ───────────────────────────────────────────────────── */
+  body {
+    background: var(--page-bg) !important;
+  }
+
+  .dash-wrap {
+    font-family: var(--sans);
+    color: var(--text);
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 0 20px 48px;
+  }
+
+  /* ─── Top header strip ───────────────────────────────────────── */
+  .dash-hdr {
+    background: var(--hdr-bg);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .dash-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: #5a5a72;
+    margin: 0 0 8px;
+  }
+
+  .dash-stats-row {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+
+  .ds-block {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ds-num {
+    font-family: var(--mono);
+    font-size: 36px;
+    line-height: 1;
+    color: #ffffff;
+    letter-spacing: -.02em;
+  }
+
+  .ds-num.accent {
+    color: var(--accent);
+  }
+
+  .ds-num.green {
+    color: #34d999;
+  }
+
+  .ds-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #5a5a72;
+    margin-top: 5px;
+  }
+
+  /* ─── Actions toolbar ────────────────────────────────────────── */
+  .dash-tools {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .tool-btn {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid #2e2e38;
+    background: transparent;
+    color: #9090aa;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+
+  .tool-btn:hover {
+    background: #2e2e38;
+    color: #ffffff;
+    border-color: #3e3e4e;
+  }
+
+  .tool-btn.accent-btn {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+  }
+
+  .tool-btn.accent-btn:hover {
+    background: #c94520;
+    border-color: #c94520;
+  }
+
+  .tool-btn:active {
+    transform: scale(0.97);
+  }
+
+  .refresh-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #5a5a72;
+  }
+
+  .refresh-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  #refreshCountdown {
+    font-family: var(--mono);
+    color: #9090aa;
+  }
+
+  /* ─── Auto-refresh toggle ────────────────────────────────────── */
+  .toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #9090aa;
+    cursor: pointer;
+  }
+
+  .toggle-switch {
+    width: 36px;
+    height: 20px;
+    background: #2e2e38;
+    border-radius: 10px;
+    position: relative;
+    transition: background 200ms ease;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: #5a5a72;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: transform 200ms var(--ease-out), background 200ms ease;
+  }
+
+  .toggle-wrap.is-on .toggle-switch {
+    background: var(--green);
+  }
+
+  .toggle-wrap.is-on .toggle-switch::after {
+    background: #fff;
+    transform: translateX(16px);
+  }
+
+  /* ─── Rate limit panel ───────────────────────────────────────── */
+  .quota-panel {
+    background: #ffffff;
+    border: 1px solid var(--card-bdr);
+    border-radius: var(--radius);
+    padding: 18px 24px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+
+  .quota-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .quota-meters {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+
+  .quota-meter {
+    flex: 1;
+    min-width: 160px;
+  }
+
+  .qm-head {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+
+  .qm-name {
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+
+  .qm-val {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  .qm-bar-bg {
+    height: 5px;
+    background: #f0ece5;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .qm-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--green);
+    width: 0;
+    transition: width 800ms var(--ease-io);
+  }
+
+  .qm-bar-fill.amber {
+    background: var(--amber);
+  }
+
+  .qm-bar-fill.danger {
+    background: var(--danger);
+  }
+
+  .quota-none {
+    font-size: 12px;
+    color: var(--xmuted);
+  }
+
+  /* ─── Sort toolbar ───────────────────────────────────────────── */
+  .sort-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .sort-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--xmuted);
+  }
+
+  .sort-btn {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    padding: 5px 12px;
+    border-radius: 5px;
+    border: 1px solid var(--card-bdr);
+    background: var(--card-bg);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 140ms ease;
+  }
+
+  .sort-btn:hover {
+    border-color: #ccc7be;
+    color: var(--text);
+  }
+
+  .sort-btn.active {
+    background: var(--text);
+    border-color: var(--text);
+    color: #fff;
+  }
+
+  /* ─── Privacy mode (blur names/logos only) ─────────────────── */
+  body.privacy-blur .prop-name,
+  body.privacy-blur .prop-favicon-wrap,
+  body.privacy-blur .prop-link-btn {
+    filter: blur(5px);
+    transition: filter 200ms ease;
+  }
+
+  body.privacy-blur .prop-name:hover,
+  body.privacy-blur .prop-favicon-wrap:hover {
+    filter: blur(0);
+  }
+
+  .tool-btn.is-active {
+    background: #2e2e38;
+    color: #ffffff;
+    border-color: #3e3e4e;
+  }
+
+  /* ─── Property card ──────────────────────────────────────────── */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .prop-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-bdr);
+    border-radius: var(--radius);
+    padding: 18px 20px 16px;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(12px);
+    transition:
+      opacity 220ms cubic-bezier(0.215, 0.61, 0.355, 1),
+      transform 220ms cubic-bezier(0.215, 0.61, 0.355, 1),
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .prop-card.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .prop-card:hover {
+    border-color: #d0c9be;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, .07);
+  }
+
+  .prop-card.has-users {
+    border-color: #b6e5d4;
+  }
+
+  .prop-card.is-error {
+    opacity: .55 !important;
+  }
+
+  .prop-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .prop-favicon-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: #f0ece5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .prop-favicon {
+    width: 28px;
+    height: 28px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .prop-name {
+    font-size: 13px;
+    font-weight: 700;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .prop-link-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    border: none;
+    background: transparent;
+    color: var(--xmuted);
+    cursor: pointer;
+    text-decoration: none;
+    flex-shrink: 0;
+    transition: background 150ms ease, color 150ms ease;
+  }
+
+  .prop-link-btn:hover {
+    background: #f0ece5;
+    color: var(--text);
+  }
+
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+    animation: pulse-dot 1.8s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(5, 150, 105, .4);
+    }
+
+    50% {
+      box-shadow: 0 0 0 5px rgba(5, 150, 105, 0);
+    }
+  }
+
+  .prop-stats {
+    display: flex;
+    gap: 20px;
+  }
+
+  .prop-stat {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .prop-stat-num {
+    font-family: var(--mono);
+    font-size: 28px;
+    line-height: 1;
+    color: var(--text);
+    letter-spacing: -.02em;
+  }
+
+  .prop-stat-num.green {
+    color: var(--green);
+  }
+
+  .prop-stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--xmuted);
+    margin-top: 4px;
+  }
+
+  .prop-error-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--danger);
+    background: #fef2f2;
+    border-radius: 4px;
+    padding: 3px 7px;
+  }
+
+  /* ─── Card detail expand ─────────────────────────────────────── */
+  .card-detail {
+    display: none;
+    border-top: 1px solid var(--card-bdr);
+    margin-top: 14px;
+    padding-top: 14px;
+  }
+
+  .card-detail.is-open {
+    display: block;
+  }
+
+  .cd-loading {
+    font-size: 11px;
+    color: var(--xmuted);
+    padding: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .cd-section {
+    margin-bottom: 12px;
+  }
+
+  .cd-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .cd-title {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--xmuted);
+    margin-bottom: 7px;
+  }
+
+  .cd-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .cd-bar-wrap {
+    flex: 1;
+    height: 3px;
+    background: #f0ece5;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .cd-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .cd-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    flex-shrink: 0;
+    min-width: 22px;
+    text-align: right;
+  }
+
+  .cd-page {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    max-width: 140px;
+  }
+
+  /* ─── Foot ──────────────────────────────────────────────────── */
+  .dash-foot {
+    margin-top: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--xmuted);
+  }
+
+  .dash-foot-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .foot-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .foot-key {
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .foot-val {
+    font-family: var(--mono);
+  }
+
+  /* ─── Spinning icon for in-flight refresh ────────────────────── */
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .spinning {
+    animation: spin 700ms linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spinning {
+      animation: none;
+    }
+  }
+</style>
+
+{{!-- ────────────────────────────────────────────────────── --}}
+<div class="dash-wrap">
+
+  {{!-- Header strip --}}
+  <div class="dash-hdr">
+    <div>
+      <p class="dash-title">GA4 · Live Monitor</p>
+      <div class="dash-stats-row">
+        <div class="ds-block">
+          <span class="ds-num green" id="jsTotal">{{totalActiveUsers}}</span>
+          <span class="ds-label">Active Now</span>
         </div>
-        <div>
-          <p>{{this.activeUsers}}</p>
-          <p>{{this.pageViews}}</p>
+        <div class="ds-block">
+          <span class="ds-num" id="jsTotalViews">{{totalPageViews}}</span>
+          <span class="ds-label">Page Views (30m)</span>
         </div>
+        <div class="ds-block">
+          <span class="ds-num accent">{{accessibleCount}}</span>
+          <span class="ds-label">Properties</span>
+        </div>
+        {{#if errorCount}}
+        <div class="ds-block">
+          <span class="ds-num" style="color:#f87171">{{errorCount}}</span>
+          <span class="ds-label">Errors</span>
+        </div>
+        {{/if}}
       </div>
-    </a>
-  {{/each}}
+      </div>
+      
+      <div class="dash-tools">
+        <div class="refresh-indicator">
+          <div class="refresh-dot" id="jsDot"></div>
+          <span id="refreshCountdown">—</span>
+        </div>
+        <div class="toggle-wrap" id="autoRefreshToggle" title="Auto-refresh every 5 min">
+          <div class="toggle-switch"></div>
+          <span>Auto</span>
+        </div>
+        <button class="tool-btn" id="privacyBtn" title="Toggle privacy mode">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:5px">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          Privacy Mode
+        </button>
+        <button class="tool-btn" id="reloadBtn" onclick="location.reload()">
+          <svg id="reloadIcon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:5px">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+          Reload
+        </button>
+        <button class="tool-btn accent-btn" id="refreshCacheBtn">
+          Refresh Properties
+        </button>
+      </div>
+      </div>
+{{!-- Rate limit panel --}}
+<div class="quota-panel" id="quotaPanel">
+    <div>
+      <div class="quota-label">API Rate Limit</div>
+      </div>
+      <div class="quota-meters" id="quotaMeters">
+        <div class="quota-none" id="quotaNone">No quota data — make at least one successful API call.</div>
+      </div>
+      </div>
+      
+      {{!-- Sort toolbar --}}
+      <div class="sort-bar">
+        <span class="sort-label">Sort</span>
+        <button class="sort-btn" data-sort="active">Active Users</button>
+        <button class="sort-btn" data-sort="views">Page Views</button>
+        <button class="sort-btn" data-sort="name">Name</button>
+      </div>
+      
+      {{!-- Property cards --}}
+      <div class="dash-grid" id="propGrid">
+        {{#each data}}
+        <div class="prop-card {{#if this.activeUsers}}has-users{{/if}} {{#if this.error}}is-error{{/if}}"
+          data-active="{{this.activeUsers}}" data-views="{{this.pageViews}}" data-name="{{this.siteName}}"
+          data-pid="{{this.propertyId}}">
+      
+          <div class="prop-head">
+            <div class="prop-favicon-wrap">
+              {{#if this.domain}}
+              <img class="prop-favicon" src="https://favicon.im/{{this.domain}}?larger=true" alt="" width="28" height="28"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              {{/if}}
+              <div class="prop-favicon-fallback"
+                style="display:{{#if this.domain}}none{{else}}flex{{/if}};align-items:center;justify-content:center;width:100%">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+              </div>
+            </div>
+<span class="prop-name">{{this.siteName}}</span>
+
+{{#if this.activeUsers}}
+<div class="live-dot" title="{{this.activeUsers}} active user(s)"></div>
+{{/if}}
+
+{{#unless this.error}}
+<a class="prop-link-btn" href="{{this.dashboardUrl}}" target="_blank" rel="noopener noreferrer"
+  onclick="event.stopPropagation()" title="Open GA4 dashboard">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+        </a>
+        {{/unless}}
+        </div>
+        
+        <div class="prop-stats">
+          <div class="prop-stat">
+            <span class="prop-stat-num {{#if this.activeUsers}}green{{/if}}"
+              data-target="{{this.activeUsers}}">{{this.activeUsers}}</span>
+            <span class="prop-stat-label">active</span>
+          </div>
+          <div class="prop-stat">
+            <span class="prop-stat-num" data-target="{{this.pageViews}}">{{this.pageViews}}</span>
+            <span class="prop-stat-label">views</span>
+          </div>
+        </div>
+        
+        {{#if this.error}}
+        <div class="prop-error-tag">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          No Access
+        </div>
+        {{/if}}
+        
+        {{!-- Expandable detail section --}}
+        {{#unless this.error}}
+        <div class="card-detail" id="cd-{{this.propertyId}}">
+          <div class="cd-loading">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              style="animation:spin 700ms linear infinite">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Loading…
+          </div>
+        </div>
+        {{/unless}}
+        </div>
+    {{/each}}
+  </div>
+  
+  {{!-- Footer --}}
+  <div class="dash-foot">
+    <div class="dash-foot-meta">
+      <div class="foot-item">
+        <span class="foot-key">Properties cached</span>
+        <span class="foot-val" id="jsCacheAge">{{cacheAge}}</span>
+      </div>
+      <div class="foot-item">
+        <span class="foot-key">Fetch time</span>
+        <span class="foot-val">{{fetchDurationMs}}ms</span>
+      </div>
+      <div class="foot-item">
+        <span class="foot-key">Cache TTL</span>
+        <span class="foot-val">12 h</span>
+      </div>
+    </div>
+    <div>
+      <span>Run <code
+          style="background:#eee;padding:2px 6px;border-radius:4px;font-size:10px">node app.js --refresh-cache</code> to
+        force-refresh on startup</span>
+    </div>
+  </div>
+
 </div>
+{{!-- JSON data for JS ──────────────────────────────────────────── --}}
 <script>
-  const livedata =
-  {{{json_stringify data}}}
-  ;
+  const PAGE_DATA = {{{ json_stringify data }}};
+  const QUOTA = {{{ json_stringify quota }}};
+  const CACHE_AGE = {{{ json_stringify cacheAge }}};
 </script>

@@ -1,0 +1,921 @@
+<style>
+  /* ─── Globe design tokens ─────────────────────────────────── */
+  :root {
+    --g-bg: #0d0d12;
+    --g-panel: rgba(13, 13, 18, 0.88);
+    --g-border: rgba(255, 255, 255, 0.07);
+    --g-text: #e8e6e1;
+    --g-muted: #6b6880;
+    --g-green: #22c374;
+    --g-accent: #e8562a;
+    --g-mono: 'DM Mono', monospace;
+    --g-sans: 'Syne', system-ui, sans-serif;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0
+  }
+
+  body {
+    background: var(--g-bg) !important;
+    color: var(--g-text);
+    font-family: var(--g-sans);
+    overflow: hidden
+  }
+
+  nav {
+    position: relative;
+    z-index: 200
+  }
+
+  .container.mx-auto.p-5.mb-auto {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important
+  }
+
+  #globe-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw !important;
+    height: 100vh !important
+  }
+
+  /* Loading */
+  #globe-loading {
+    position: fixed;
+    inset: 0;
+    background: var(--g-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 16px;
+    transition: opacity 600ms ease
+  }
+
+  .gl-spinner {
+    width: 36px;
+    height: 36px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--g-green);
+    border-radius: 50%;
+    animation: spin 800ms linear infinite
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg)
+    }
+  }
+
+  .gl-load-text {
+    font-size: 12px;
+    color: var(--g-muted);
+    letter-spacing: .1em
+  }
+
+  /* Left panel */
+  #panel-left {
+    position: fixed;
+    left: 20px;
+    top: 72px;
+    width: 260px;
+    background: var(--g-panel);
+    border: 1px solid var(--g-border);
+    border-radius: 14px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    overflow: hidden;
+    z-index: 20;
+    max-height: calc(100vh - 160px);
+    overflow-y: auto
+  }
+
+  #panel-left::-webkit-scrollbar {
+    width: 3px
+  }
+
+  #panel-left::-webkit-scrollbar-thumb {
+    background: var(--g-border);
+    border-radius: 2px
+  }
+
+  .pl-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--g-border);
+    display: flex;
+    align-items: center;
+    gap: 10px
+  }
+
+  .pl-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--g-green);
+    flex-shrink: 0;
+    animation: pulse-dot 1.8s ease-in-out infinite
+  }
+
+  @keyframes pulse-dot {
+
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(34, 195, 116, .4)
+    }
+
+    50% {
+      box-shadow: 0 0 0 5px rgba(34, 195, 116, 0)
+    }
+  }
+
+  .pl-total {
+    font-family: var(--g-mono);
+    font-size: 28px;
+    color: var(--g-text);
+    letter-spacing: -.02em;
+    line-height: 1
+  }
+
+  .pl-total-label {
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--g-muted);
+    margin-top: 3px
+  }
+
+  .pl-section {
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--g-border)
+  }
+
+  .pl-section:last-child {
+    border-bottom: none
+  }
+
+  .pl-section-title {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--g-muted);
+    margin-bottom: 8px
+  }
+
+  .pl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 12px;
+    color: var(--g-text)
+  }
+
+  .pl-row-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 11px
+  }
+
+  .pl-row-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+  }
+
+  .pl-row-count {
+    font-family: var(--g-mono);
+    font-size: 11px;
+    color: var(--g-muted);
+    flex-shrink: 0
+  }
+
+  .pl-row-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex-shrink: 0
+  }
+
+  .badge-desktop {
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc
+  }
+
+  .badge-mobile {
+    background: rgba(34, 195, 116, 0.18);
+    color: var(--g-green)
+  }
+
+  .badge-tablet {
+    background: rgba(251, 191, 36, 0.18);
+    color: #fbbf24
+  }
+
+  /* Control buttons */
+  #panel-controls {
+    position: fixed;
+    right: 20px;
+    top: 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 20
+  }
+
+  .ctrl-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--g-panel);
+    border: 1px solid var(--g-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    color: var(--g-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color 150ms ease, border-color 150ms ease
+  }
+
+  .ctrl-btn:hover {
+    color: var(--g-text);
+    border-color: rgba(255, 255, 255, 0.15)
+  }
+
+  .ctrl-btn.active {
+    color: var(--g-green);
+    border-color: rgba(34, 195, 116, 0.35)
+  }
+
+  /* Bottom feed */
+  #panel-feed {
+    position: fixed;
+    bottom: 0;
+    left: 300px;
+    right: 80px;
+    background: var(--g-panel);
+    border-top: 1px solid var(--g-border);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 20;
+    padding: 10px 20px;
+    height: 115px
+  }
+
+  .feed-header {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--g-muted);
+    margin-bottom: 7px
+  }
+
+  .feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px
+  }
+
+  .feed-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 11px;
+    color: var(--g-text);
+    opacity: 0;
+    transform: translateY(8px);
+    animation: feedIn 350ms ease forwards
+  }
+
+  @keyframes feedIn {
+    to {
+      opacity: 1;
+      transform: translateY(0)
+    }
+  }
+
+  .feed-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff
+  }
+
+  .feed-flag {
+    font-size: 13px;
+    flex-shrink: 0
+  }
+
+  .feed-city {
+    font-weight: 600
+  }
+
+  .feed-page {
+    color: var(--g-muted);
+    font-family: var(--g-mono);
+    font-size: 10px
+  }
+
+  .feed-via {
+    color: var(--g-muted)
+  }
+
+  .feed-count {
+    font-family: var(--g-mono);
+    font-size: 10px;
+    background: rgba(34, 195, 116, 0.18);
+    color: var(--g-green);
+    padding: 1px 5px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-left: auto
+  }
+
+  /* Avatar markers */
+  .globe-avatar {
+    position: relative;
+    cursor: pointer
+  }
+
+  .globe-avatar-dot {
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #fff;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    overflow: hidden
+  }
+
+  .globe-avatar-ring {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+    opacity: 0.4;
+    animation: avatarRing 2s ease-out infinite
+  }
+
+  @keyframes avatarRing {
+    0% {
+      transform: scale(1);
+      opacity: 0.4
+    }
+
+    100% {
+      transform: scale(1.9);
+      opacity: 0
+    }
+  }
+
+  .globe-avatar-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--g-accent);
+    color: #fff;
+    font-size: 8px;
+    font-weight: 700;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    border: 1.5px solid var(--g-bg)
+  }
+
+  /* Avatar popup */
+  #avatarPopup {
+    position: fixed;
+    z-index: 200;
+    background: rgba(13, 13, 18, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 14px 16px;
+    width: 210px;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+    pointer-events: all;
+    display: none
+  }
+
+  #avatarPopup.show {
+    display: block
+  }
+
+  .ap-header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 10px
+  }
+
+  .ap-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    flex-shrink: 0
+  }
+
+  .ap-avatar img {
+    width: 100%;
+    height: 100%;
+    display: block
+  }
+
+  .ap-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--g-text);
+    line-height: 1.2
+  }
+
+  .ap-sub {
+    font-size: 10px;
+    color: var(--g-muted);
+    margin-top: 1px
+  }
+
+  .ap-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    color: var(--g-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0
+  }
+
+  .ap-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--g-text)
+  }
+
+  .ap-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--g-text);
+    padding: 3px 0
+  }
+
+  .ap-row-label {
+    color: var(--g-muted);
+    width: 56px;
+    flex-shrink: 0;
+    font-size: 10px;
+    letter-spacing: .04em
+  }
+
+  .ap-chip {
+    background: rgba(34, 195, 116, 0.18);
+    color: var(--g-green);
+    font-family: var(--g-mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px
+  }
+
+  /* Properties panel search */
+  .pl-search {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--g-border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
+    color: var(--g-text);
+    margin-bottom: 7px;
+    outline: none;
+    font-family: var(--g-mono)
+  }
+
+  .pl-search::placeholder {
+    color: var(--g-muted)
+  }
+
+  .pl-search:focus {
+    border-color: rgba(34, 195, 116, 0.35)
+  }
+
+  .pl-prop-bar {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--g-green);
+    margin-top: 3px;
+    transition: width 400ms ease
+  }
+
+  /* Meta */
+  #panel-meta {
+    position: fixed;
+    bottom: 125px;
+    right: 20px;
+    font-size: 10px;
+    color: var(--g-muted);
+    text-align: right;
+    z-index: 20;
+    line-height: 1.9
+  }
+
+  /* Privacy blur */
+  body.privacy-blur #panel-left,
+  body.privacy-blur #panel-feed {
+    filter: blur(6px)
+  }
+
+  @media(prefers-reduced-motion:reduce) {
+
+    .gl-spinner,
+    .pl-live-dot,
+    .globe-avatar-ring,
+    .feed-item {
+      animation: none !important
+    }
+
+    .feed-item {
+      opacity: 1;
+      transform: none
+    }
+  }
+</style>
+
+<div id="globe-loading">
+  <div class="gl-spinner"></div>
+  <p class="gl-load-text">FETCHING LIVE DATA…</p>
+</div>
+
+<div id="globe-canvas"></div>
+
+<div id="panel-left">
+  <div class="pl-header">
+    <div class="pl-live-dot"></div>
+    <div>
+      <div class="pl-total" id="glTotalUsers">0</div>
+      <div class="pl-total-label">Active Users</div>
+    </div>
+  </div>
+  <div class="pl-section">
+    <div class="pl-section-title">Top Cities</div>
+    <div id="referrerList">
+      <div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">Loading…</span></div>
+    </div>
+  </div>
+  <div class="pl-section">
+    <div class="pl-section-title">Countries</div>
+    <div id="countryList">
+      <div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">Loading…</span></div>
+    </div>
+  </div>
+  <div class="pl-section">
+    <div class="pl-section-title">Devices</div>
+    <div id="deviceList">
+      <div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">Loading…</span></div>
+    </div>
+  </div>
+  <div class="pl-section">
+    <div class="pl-section-title">Properties</div>
+    <input class="pl-search" id="propFilter" type="search" placeholder="Filter…" autocomplete="off">
+    <div id="propertiesList">
+      <div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">Loading…</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Avatar popup -->
+<div id="avatarPopup" role="tooltip">
+  <button class="ap-close" id="apClose" aria-label="Close">&#x2715;</button>
+  <div class="ap-header">
+    <div class="ap-avatar"><img id="apImg" src="" alt=""></div>
+    <div>
+      <div class="ap-name" id="apCity"></div>
+      <div class="ap-sub" id="apCountry"></div>
+    </div>
+  </div>
+  <div class="ap-row"><span class="ap-row-label">Device</span><span id="apDevice"></span></div>
+  <div class="ap-row"><span class="ap-row-label">Property</span><span id="apProp"
+      style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px"></span></div>
+  <div class="ap-row"><span class="ap-row-label">Users</span><span class="ap-chip" id="apCount"></span></div>
+</div>
+
+<div id="panel-controls">
+  <button class="ctrl-btn active" id="btnRotate" title="Auto-rotate">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21.5 2v6h-6" />
+      <path d="M2.5 12a10 10 0 0 1 17.8-6.3L21.5 8" />
+      <path d="M2.5 22v-6h6" />
+      <path d="M21.5 12a10 10 0 0 1-17.8 6.3L2.5 16" />
+    </svg>
+  </button>
+  <button class="ctrl-btn" id="btnBlur" title="Privacy blur">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  </button>
+  <button class="ctrl-btn" id="btnRefresh" title="Refresh">
+    <svg id="refreshGlobeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2">
+      <polyline points="23 4 23 10 17 10" />
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
+  </button>
+</div>
+
+<div id="panel-feed">
+  <div class="feed-header">Live Visitors</div>
+  <div class="feed-list" id="feedList">
+    <div class="feed-item" style="opacity:.4"><span style="color:var(--g-muted)">Waiting for data…</span></div>
+  </div>
+</div>
+
+<div id="panel-meta">
+  <div>Updated <span id="glFetchedAt">—</span></div>
+  <div>↻ in <span id="glCountdown" style="font-family:var(--g-mono)">—</span></div>
+</div>
+
+<script src="https://unpkg.com/globe.gl@2/dist/globe.gl.min.js"></script>
+<script>
+  const GLOBE_USERS_URL = '/api/globe-users';
+  const REFRESH_SEC = 30;
+  const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let globe, isRotating = true;
+  let countdownTimer, countdown = REFRESH_SEC;
+
+  function flag(iso) {
+    if (!iso || iso.length !== 2) return '🌐';
+    try { return String.fromCodePoint(...[...iso.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0))); }
+    catch { return '🌐'; }
+  }
+
+  function deviceBadge(name) {
+    const n = (name || '').toLowerCase();
+    if (n === 'mobile') return '<span class="pl-row-badge badge-mobile">Mobile</span>';
+    if (n === 'tablet') return '<span class="pl-row-badge badge-tablet">Tablet</span>';
+    return '<span class="pl-row-badge badge-desktop">Desktop</span>';
+  }
+
+  function srcIcon(name) {
+    const icons = {
+      google: 'G', bing: 'B', facebook: 'F', twitter: 'X', x: 'X',
+      instagram: 'I', youtube: 'Y', direct: '→', reddit: 'R'
+    };
+    const letter = icons[(name || '').toLowerCase()] || (name || '?').charAt(0).toUpperCase();
+    return `<div class="pl-row-icon" style="font-size:10px;font-weight:700">${letter}</div>`;
+  }
+
+  function makeAvatarEl(user) {
+    const sz = Math.min(26 + user.count * 4, 46);
+    const color = user.color || '#22c374';
+    const seed = encodeURIComponent(user.city + user.countryId);
+    const el = document.createElement('div');
+    el.className = 'globe-avatar';
+    el.style.cssText = `width:${sz}px;height:${sz}px;color:${color}`;
+    el.title = `${user.city}, ${user.country} — ${user.count} user${user.count !== 1 ? 's' : ''}`;
+    el.innerHTML = `
+    <div class="globe-avatar-dot" style="width:${sz}px;height:${sz}px;background:${color}">
+      <img src="https://api.dicebear.com/9.x/pixel-art/svg?seed=${seed}&size=${sz}"
+           width="${sz}" height="${sz}" style="border-radius:50%;display:block"
+           onerror="this.style.display='none'">
+    </div>
+    <div class="globe-avatar-ring"></div>
+    ${user.count > 1 ? `<div class="globe-avatar-count">${user.count}</div>` : ''}
+  `;
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const popup = document.getElementById('avatarPopup');
+      const rect = el.getBoundingClientRect();
+      // Position popup: prefer right side, flip left if too close to edge
+      let left = rect.right + 8;
+      if (left + 218 > window.innerWidth) left = rect.left - 226;
+      let top = rect.top - 20;
+      if (top + 180 > window.innerHeight) top = window.innerHeight - 185;
+      popup.style.left = Math.max(8, left) + 'px';
+      popup.style.top = Math.max(8, top) + 'px';
+      document.getElementById('apImg').src = `https://api.dicebear.com/9.x/pixel-art/svg?seed=${seed}&size=38`;
+      document.getElementById('apCity').textContent = user.city || 'Unknown City';
+      document.getElementById('apCountry').textContent = `${flag(user.countryId)} ${user.country || ''}`;
+      document.getElementById('apDevice').textContent = user.device || 'Desktop';
+      document.getElementById('apProp').textContent = user.prop || '—';
+      document.getElementById('apCount').textContent = `${user.count} active`;
+      popup.classList.add('show');
+    });
+
+    return el;
+  }
+
+  function updatePanels(json) {
+    const users = json.users || [];
+    const cities = json.cities || [];
+    const countries = json.countries || [];
+    const devices = json.devices || [];
+    const properties = json.properties || [];
+    window._globeProperties = properties; // save for filter
+
+    const rawTotal = json.totalActiveUsers ?? users.reduce((s, u) => s + u.count, 0);
+    document.getElementById('glTotalUsers').textContent = rawTotal.toLocaleString();
+
+    document.getElementById('referrerList').innerHTML = cities.length
+      ? cities.slice(0, 7).map(c =>
+        `<div class="pl-row"><span class="pl-row-icon" style="font-size:13px;background:none">${flag(c.id)}</span><span class="pl-row-name">${c.city}</span><span class="pl-row-count">${c.count}</span></div>`
+      ).join('')
+      : '<div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">No data</span></div>';
+
+    document.getElementById('countryList').innerHTML = countries.length
+      ? countries.slice(0, 7).map(c =>
+        `<div class="pl-row"><span class="pl-row-icon" style="font-size:13px;background:none">${flag(c.id)}</span><span class="pl-row-name">${c.name}</span><span class="pl-row-count">${c.count}</span></div>`
+      ).join('')
+      : '<div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">No data</span></div>';
+
+    document.getElementById('deviceList').innerHTML = devices.length
+      ? devices.map(d =>
+        `<div class="pl-row">${deviceBadge(d.name)}<span class="pl-row-name">${d.name}</span><span class="pl-row-count">${d.count}</span></div>`
+      ).join('')
+      : '<div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">No data</span></div>';
+
+    renderPropertiesList(properties, '');
+  }
+
+  function updateFeed(json) {
+    const users = json.users || [];
+    const feedEl = document.getElementById('feedList');
+    if (!users.length) {
+      feedEl.innerHTML = '<div class="feed-item" style="opacity:.4"><span style="color:var(--g-muted)">No active visitors right now.</span></div>';
+      return;
+    }
+    feedEl.innerHTML = users.slice(0, 4).map((u, i) => `
+    <div class="feed-item" style="animation-delay:${i * 60}ms">
+      <div class="feed-avatar" style="background:${u.color}">${(u.city || '?').charAt(0).toUpperCase()}</div>
+      <span class="feed-flag">${flag(u.countryId)}</span>
+      <span class="feed-city">${u.city}</span>
+      <span class="feed-via">via</span>
+      <span style="font-size:11px;color:var(--g-muted)">${u.device || 'Desktop'}</span>
+      <span class="feed-count">×${u.count}</span>
+    </div>
+  `).join('');
+  }
+
+  function renderGlobe(json) {
+    if (!globe) return;
+    const users = (json.users || []).filter(u => u.lat != null && u.lng != null);
+    globe
+      .htmlElementsData(users)
+      .htmlLat('lat')
+      .htmlLng('lng')
+      .htmlAltitude(0.01)
+      .htmlElement(d => makeAvatarEl(d));
+  }
+
+  function renderPropertiesList(properties, query) {
+    const q = (query || '').toLowerCase();
+    const rows = properties.filter(p => !q || p.site.toLowerCase().includes(q) || (p.domain || '').includes(q));
+    const max = rows.length ? Math.max(...rows.map(r => r.count)) : 1;
+    document.getElementById('propertiesList').innerHTML = rows.length
+      ? rows.map(p => `
+        <div class="pl-row" style="flex-direction:column;align-items:flex-start;gap:1px;padding:5px 0;border-bottom:1px solid var(--g-border)">
+          <div style="display:flex;align-items:center;gap:6px;width:100%">
+            <span class="pl-row-name" style="font-size:11px;font-weight:600">${p.site}</span>
+            <span class="pl-row-count">${p.count}</span>
+          </div>
+          ${p.domain ? `<div style="font-size:9px;color:var(--g-muted);margin-bottom:2px">${p.domain}</div>` : ''}
+          <div class="pl-prop-bar" style="width:${Math.round((p.count / max) * 100)}%"></div>
+        </div>`).join('')
+      : '<div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">No matching properties</span></div>';
+  }
+
+  async function fetchAndRender() {
+    try {
+      const res = await fetch(GLOBE_USERS_URL);
+      const json = await res.json();
+      renderGlobe(json);
+      updatePanels(json);
+      updateFeed(json);
+      document.getElementById('glFetchedAt').textContent =
+        new Date(json.fetchedAt || Date.now()).toLocaleTimeString();
+    } catch (err) { console.error('[globe]', err); }
+  }
+
+  async function initGlobe() {
+    const navH = document.querySelector('nav')?.offsetHeight ?? 64;
+    document.getElementById('panel-left').style.top = (navH + 12) + 'px';
+    document.getElementById('panel-controls').style.top = (navH + 12) + 'px';
+
+    globe = Globe({ animateIn: false })
+      .globeImageUrl('//unpkg.com/three-globe/example/img/earth-dark.jpg')
+      .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
+      .atmosphereColor('#1a3dff')
+      .atmosphereAltitude(0.14)
+      .enablePointerInteraction(true)
+      (document.getElementById('globe-canvas'));
+
+    const resize = () => { globe.width(window.innerWidth); globe.height(window.innerHeight); };
+    resize();
+    window.addEventListener('resize', resize);
+
+    if (!REDUCED_MOTION) {
+      globe.controls().autoRotate = true;
+      globe.controls().autoRotateSpeed = 0.3;
+    }
+
+    const loadEl = document.getElementById('globe-loading');
+    loadEl.style.opacity = '0';
+    setTimeout(() => loadEl.remove(), 700);
+
+    await fetchAndRender();
+    startCountdown();
+  }
+
+  function startCountdown() {
+    clearInterval(countdownTimer);
+    countdown = REFRESH_SEC;
+    const el = document.getElementById('glCountdown');
+    el.textContent = countdown + 's';
+    countdownTimer = setInterval(async () => {
+      countdown--;
+      el.textContent = countdown + 's';
+      if (countdown <= 0) { countdown = REFRESH_SEC; await fetchAndRender(); }
+    }, 1000);
+  }
+
+  document.getElementById('btnRotate').addEventListener('click', () => {
+    isRotating = !isRotating;
+    if (globe) globe.controls().autoRotate = isRotating && !REDUCED_MOTION;
+    document.getElementById('btnRotate').classList.toggle('active', isRotating);
+  });
+
+  document.getElementById('btnBlur').addEventListener('click', () => {
+    const on = document.body.classList.toggle('privacy-blur');
+    document.getElementById('btnBlur').classList.toggle('active', on);
+  });
+
+  document.getElementById('btnRefresh').addEventListener('click', async () => {
+    const icon = document.getElementById('refreshGlobeIcon');
+    icon.style.animation = 'spin 700ms linear infinite';
+    countdown = REFRESH_SEC;
+    await fetchAndRender();
+    icon.style.animation = '';
+    startCountdown();
+  });
+
+  // Avatar popup: close on X button or click outside
+  document.getElementById('apClose').addEventListener('click', () => {
+    document.getElementById('avatarPopup').classList.remove('show');
+  });
+  document.addEventListener('click', (e) => {
+    const popup = document.getElementById('avatarPopup');
+    if (popup.classList.contains('show') && !popup.contains(e.target)) {
+      popup.classList.remove('show');
+    }
+  });
+
+  // Properties filter
+  document.getElementById('propFilter').addEventListener('input', (e) => {
+    renderPropertiesList(window._globeProperties || [], e.target.value);
+  });
+
+  initGlobe();
+</script>
