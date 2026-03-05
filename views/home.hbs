@@ -644,6 +644,55 @@
       animation: none;
     }
   }
+
+  /* ─── Keyboard hint bar ─────────────────────────────────── */
+  .kbd-hint-bar {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 14px;
+    font-size: 10px;
+    color: var(--xmuted);
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+  .kbd-hint-bar kbd {
+    background: var(--card-bg);
+    border: 1px solid var(--card-bdr);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: var(--mono);
+    font-size: 10px;
+    margin-right: 3px;
+  }
+
+  /* ─── Dark mode quota ──────────────────────────────────── */
+  [data-theme="dark"] .quota-panel {
+    background: var(--card-bg);
+    border-color: var(--card-bdr);
+  }
+  [data-theme="dark"] .qm-bar-bg {
+    background: rgba(255,255,255,0.06);
+  }
+  [data-theme="dark"] .cd-bar-wrap {
+    background: rgba(255,255,255,0.06);
+  }
+  [data-theme="dark"] .dash-foot code {
+    background: rgba(255,255,255,0.08);
+    color: var(--muted);
+  }
+  [data-theme="dark"] .prop-link-btn:hover {
+    background: rgba(255,255,255,0.08);
+  }
+  [data-theme="dark"] .prop-favicon-wrap {
+    background: rgba(255,255,255,0.06);
+  }
+  [data-theme="dark"] .prop-error-tag {
+    background: rgba(239,68,68,0.12);
+  }
 </style>
 
 {{!-- ────────────────────────────────────────────────────── --}}
@@ -652,7 +701,7 @@
   {{!-- Header strip --}}
   <div class="dash-hdr">
     <div>
-      <p class="dash-title">GA4 · Live Monitor</p>
+      <p class="dash-title">Pulseboard</p>
       <div class="dash-stats-row">
         <div class="ds-block">
           <span class="ds-num green" id="jsTotal">{{totalActiveUsers}}</span>
@@ -753,7 +802,7 @@
 
 {{#unless this.error}}
 <a class="prop-link-btn" href="{{this.dashboardUrl}}" target="_blank" rel="noopener noreferrer"
-  onclick="event.stopPropagation()" title="Open GA4 dashboard">
+  onclick="event.stopPropagation()" title="Open property dashboard">
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
     <polyline points="15 3 21 3 21 9" />
@@ -825,6 +874,15 @@
     </div>
   </div>
 
+</div>
+
+{{!-- Keyboard shortcut hints --}}
+<div class="kbd-hint-bar">
+  <span><kbd>R</kbd> Reload</span>
+  <span><kbd>P</kbd> Privacy</span>
+  <span><kbd>A</kbd> Auto</span>
+  <span><kbd>G</kbd> Globe</span>
+  <span><kbd>?</kbd> Help</span>
 </div>
 {{!-- JSON data for JS ──────────────────────────────────────────── --}}
 <script>

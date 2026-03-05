@@ -1,33 +1,62 @@
-<footer class='flex justify-center px-4 text-gray-800 bg-white'>
-    <div class='container py-3'>
-
-        <div class='flex flex-col items-center justify-between md:flex-row'>
-            <div>
-                <a
-                    class='text-2xl font-bold font-heading text-gray-800 transition-colors duration-200 transform lg:text-3xl hover:text-gray-700'
-                    href='/'
-                >
-                    <span class='text-amber-500'>GA4</span>Live
-                </a>
-            </div>
-
-            <div class='flex mt-4 md:m-0'>
-                <div class='-mx-4'>
-                    {{!-- <a
-                        href='/about?ref=footer'
-                        class='px-4 text-sm font-medium text-gray-800 hover:text-gray-700 hover:underline'
-                    >About</a>
-
-                    <a
-                        href='/privacy-policy?ref=footer'
-                        class='px-4 text-sm font-medium text-gray-800 hover:text-gray-700 hover:underline'
-                    >Privacy Policy</a>
-                    <a
-                        href='/contact?ref=footer'
-                        class='px-4 text-sm font-medium text-gray-800 hover:text-gray-700 hover:underline'
-                    >Contact</a> --}}
-                </div>
-            </div>
-        </div>
+<footer id="appFooter">
+  <div class="footer-inner">
+    <a class="footer-brand" href="/">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--nav-accent,#e8562a)">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <span>Pulseboard</span>
+    </a>
+    <div class="footer-links">
+      <a href="/">Dashboard</a>
+      <a href="/globe">Globe</a>
+      <a href="/analytics">Analytics</a>
     </div>
+    <span class="footer-copy">&copy; {{currentYear}} Pulseboard</span>
+  </div>
 </footer>
+
+<style>
+  #appFooter {
+    border-top: 1px solid var(--nav-border, #ebebeb);
+    background: var(--nav-bg, #fff);
+    padding: 14px 20px;
+    font-family: 'Syne', system-ui, sans-serif;
+  }
+  .footer-inner {
+    max-width: 1340px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .footer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--nav-text, #18181c);
+    text-decoration: none;
+    letter-spacing: -.01em;
+  }
+  .footer-links {
+    display: flex;
+    gap: 16px;
+  }
+  .footer-links a {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    color: var(--nav-muted, #78756f);
+    text-decoration: none;
+    transition: color 150ms ease;
+  }
+  .footer-links a:hover { color: var(--nav-text, #18181c) }
+  .footer-copy {
+    font-size: 10px;
+    color: var(--nav-muted, #78756f);
+    letter-spacing: .04em;
+  }
+</style>

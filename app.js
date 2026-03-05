@@ -52,6 +52,9 @@ app.engine('hbs', exphbs.engine({
 		},
 		json_parse: function (context) {
 			return JSON.parse(context);
+		},
+		currentYear: function () {
+			return new Date().getFullYear();
 		}
 	}
 }));

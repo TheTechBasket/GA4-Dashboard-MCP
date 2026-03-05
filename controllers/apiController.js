@@ -322,7 +322,7 @@ exports.allrealtime = async (req, res) => {
             accessibleCount: accessible.length,
             errorCount: errors.length,
             head: {
-                title: "GA4 Live Monitor",
+                title: "Pulseboard · Live Monitor",
                 description: "Real-time Analytics Dashboard",
                 image: "",
                 url: "",
@@ -352,48 +352,53 @@ exports.propertyDetail = async (req, res) => {
         const { BetaAnalyticsDataClient } = require("@google-analytics/data");
         const client = new BetaAnalyticsDataClient({ keyFilename: CREDENTIALS_PATH });
 
-        // Run three focused realtime reports in parallel
-        const [countryRes, sourceRes, pageRes] = await Promise.all([
-            client.runRealtimeReport({
+        // Helper: run a single realtime report, return empty on failure
+        const safe = async (opts) => {
+            try { const [r] = await client.runRealtimeReport(opts); return r; }
+            catch (e) { console.warn(`[detail] ${propertyId} dim error:`, e.message); return { rows: [] }; }
+        };
+
+        // Run three focused realtime reports in parallel (each isolated so one failure doesn't break the rest)
+        // NOTE: firstUserSource / sessionSource are NOT valid realtime dimensions.
+        //       Use eventName for top events instead.
+        const [countryRes, eventRes, pageRes] = await Promise.all([
+            safe({
                 property: `properties/${propertyId}`,
                 dimensions: [{ name: "country" }, { name: "countryId" }],
                 metrics: [{ name: "activeUsers" }],
                 minuteRanges: [{ startMinutesAgo: 29, endMinutesAgo: 0 }],
-                limit: 10,
             }),
-            client.runRealtimeReport({
+            safe({
                 property: `properties/${propertyId}`,
-                dimensions: [{ name: "firstUserSource" }],
+                dimensions: [{ name: "eventName" }],
                 metrics: [{ name: "activeUsers" }],
                 minuteRanges: [{ startMinutesAgo: 29, endMinutesAgo: 0 }],
-                limit: 10,
             }),
-            client.runRealtimeReport({
+            safe({
                 property: `properties/${propertyId}`,
                 dimensions: [{ name: "unifiedScreenName" }],
                 metrics: [{ name: "screenPageViews" }],
                 minuteRanges: [{ startMinutesAgo: 29, endMinutesAgo: 0 }],
-                limit: 10,
             }),
         ]);
 
-        const countries = (countryRes[0].rows || []).map(r => ({
+        const countries = (countryRes.rows || []).map(r => ({
             name: r.dimensionValues?.[0]?.value ?? "Unknown",
             id:   r.dimensionValues?.[1]?.value ?? "ZZ",
             users: parseInt(r.metricValues?.[0]?.value || "0", 10),
         })).filter(r => r.users > 0);
 
-        const sources = (sourceRes[0].rows || []).map(r => ({
-            name:  r.dimensionValues?.[0]?.value ?? "(direct)",
+        const events = (eventRes.rows || []).map(r => ({
+            name:  r.dimensionValues?.[0]?.value ?? "(unknown)",
             users: parseInt(r.metricValues?.[0]?.value || "0", 10),
-        })).filter(r => r.users > 0);
+        })).filter(r => r.users > 0).slice(0, 8);
 
-        const pages = (pageRes[0].rows || []).map(r => ({
+        const pages = (pageRes.rows || []).map(r => ({
             path:  r.dimensionValues?.[0]?.value ?? "/",
             views: parseInt(r.metricValues?.[0]?.value || "0", 10),
-        })).filter(r => r.views > 0);
+        })).filter(r => r.views > 0).slice(0, 8);
 
-        res.json({ ok: true, countries, sources, pages });
+        res.json({ ok: true, countries, events, pages });
     } catch (err) {
         if (err.code === 7) {
             return res.status(403).json({ error: "Permission denied for this property" });
@@ -551,7 +556,8 @@ async function fetchGlobeUsersData(properties) {
                 });
                 return { prop, rows: response.rows || [] };
             } catch (err) {
-                if (err.code !== 7) console.warn(`[globe-users] ${prop.site}: ${err.message}`);
+                // 7 = PERMISSION_DENIED (no access), 3 = INVALID_ARGUMENT (dim conflict)
+                if (err.code !== 7 && err.code !== 3) console.warn(`[globe-users] ${prop.site}: ${err.message}`);
                 return { prop, rows: [] };
             }
         })
@@ -663,7 +669,7 @@ exports.globeData = async (req, res) => {
 exports.globeView = (req, res) => {
     res.render("globe", {
         head: {
-            title: "GA4 Globe · Live Users",
+            title: "Pulseboard · Globe",
             description: "3D real-time active user globe",
             image: "",
             url: "",
@@ -683,7 +689,7 @@ exports.analyticsView = async (req, res) => {
         res.render("analytics", {
             properties,
             head: {
-                title: "GA4 Analytics",
+                title: "Pulseboard · Analytics",
                 description: "In-depth analytics dashboard",
                 image: "",
                 url: "",

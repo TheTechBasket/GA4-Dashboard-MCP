@@ -1,8 +1,9 @@
 /* ──────────────────────────────────────────────────────────────
-   GA4 Live Monitor — main.js
+   Pulseboard — main.js
    Handles: card reveal animations, count-up, quota bars,
             auto-refresh toggle, cache refresh, sort, card expand,
-            privacy blur, quota live-polling.
+            privacy blur, quota live-polling, keyboard shortcuts,
+            toast notifications.
 ─────────────────────────────────────────────────────────────── */
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -171,7 +172,7 @@ setInterval(pollQuota, QUOTA_POLL_MS);
 
 // ── Sort cards ────────────────────────────────────────────────
 
-const SORT_KEY = 'ga4_sort';
+const SORT_KEY = 'pb_sort';
 
 function sortCards(by) {
   const grid  = document.getElementById('propGrid');
@@ -240,10 +241,10 @@ function renderDetail(pid, data) {
       ${rows(data.countries, 'users', r => `${flagEmoji(r.id)} ${r.name}`)}
     </div>` : '';
 
-  const sourcesHtml = data.sources?.length ? `
+  const eventsHtml = data.events?.length ? `
     <div class="cd-section">
-      <div class="cd-title">Traffic Source</div>
-      ${rows(data.sources, 'users', r => r.name || '(direct)')}
+      <div class="cd-title">Top Events</div>
+      ${rows(data.events, 'users', r => r.name || '(unknown)')}
     </div>` : '';
 
   const pagesHtml = data.pages?.length ? `
@@ -260,10 +261,10 @@ function renderDetail(pid, data) {
       }).join('')}
     </div>` : '';
 
-  const empty = !countriesHtml && !sourcesHtml && !pagesHtml;
+  const empty = !countriesHtml && !eventsHtml && !pagesHtml;
   el.innerHTML = empty
     ? '<div class="cd-loading" style="color:var(--xmuted)">No real-time data right now.</div>'
-    : countriesHtml + sourcesHtml + pagesHtml;
+    : countriesHtml + eventsHtml + pagesHtml;
 }
 
 async function loadCardDetail(pid) {
@@ -305,13 +306,13 @@ document.querySelectorAll('.prop-card[data-pid]').forEach(card => {
 
 const privacyBtn = document.getElementById('privacyBtn');
 if (privacyBtn) {
-  const saved = localStorage.getItem('ga4_privacy') === '1';
+  const saved = localStorage.getItem('pb_privacy') === '1';
   if (saved) { document.body.classList.add('privacy-blur'); privacyBtn.classList.add('is-active'); }
 
   privacyBtn.addEventListener('click', () => {
     const on = document.body.classList.toggle('privacy-blur');
     privacyBtn.classList.toggle('is-active', on);
-    localStorage.setItem('ga4_privacy', on ? '1' : '0');
+    localStorage.setItem('pb_privacy', on ? '1' : '0');
   });
 }
 
@@ -347,11 +348,11 @@ function stopCountdown() {
 function setAutoRefresh(on) {
   if (on) { toggleEl && toggleEl.classList.add('is-on'); startCountdown(); }
   else    { toggleEl && toggleEl.classList.remove('is-on'); stopCountdown(); }
-  localStorage.setItem('ga4_autoRefresh', on ? '1' : '0');
+  localStorage.setItem('pb_autoRefresh', on ? '1' : '0');
 }
 
 if (toggleEl) {
-  const saved = localStorage.getItem('ga4_autoRefresh') === '1';
+  const saved = localStorage.getItem('pb_autoRefresh') === '1';
   setAutoRefresh(saved);
   toggleEl.addEventListener('click', () => setAutoRefresh(!toggleEl.classList.contains('is-on')));
 }
@@ -414,4 +415,66 @@ window.addEventListener('load', () => {
   buildQuotaBars();
 });
 
+// ── Toast notification system ──────────────────────────────────
 
+function showToast(msg) {
+  let container = document.getElementById('pbToast');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'pbToast';
+    container.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px';
+    document.body.appendChild(container);
+  }
+  const el = document.createElement('div');
+  el.style.cssText = 'background:var(--card-bg,#fff);border:1px solid var(--card-bdr,#e9e5df);border-radius:8px;padding:10px 16px;font-size:12px;font-weight:600;color:var(--text,#18181c);box-shadow:0 4px 20px rgba(0,0,0,.12);display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(8px);transition:opacity 250ms cubic-bezier(0.215,0.61,0.355,1),transform 250ms cubic-bezier(0.215,0.61,0.355,1)';
+  el.textContent = msg;
+  container.appendChild(el);
+  requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+  setTimeout(() => {
+    el.style.opacity = '0'; el.style.transform = 'translateY(8px)';
+    setTimeout(() => el.remove(), 300);
+  }, 2800);
+}
+
+// ── Keyboard shortcuts (dashboard) ─────────────────────────────
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+  switch (e.key.toLowerCase()) {
+    case 'r':
+      e.preventDefault();
+      const reloadBtn = document.getElementById('reloadBtn');
+      if (reloadBtn) { reloadBtn.click(); showToast('Reloading…'); }
+      break;
+    case 'p':
+      e.preventDefault();
+      const privBtn = document.getElementById('privacyBtn');
+      if (privBtn) privBtn.click();
+      break;
+    case 'a':
+      e.preventDefault();
+      const toggleEl2 = document.getElementById('autoRefreshToggle');
+      if (toggleEl2) toggleEl2.click();
+      break;
+    case 'g':
+      e.preventDefault();
+      window.location.href = '/globe';
+      break;
+    case '?':
+      e.preventDefault();
+      showToast('R Reload · P Privacy · A Auto-refresh · G Globe · 1-3 Sort');
+      break;
+  }
+});
+
+// ── Sort via number keys ───────────────────────────────────────
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === '1') sortCards('active');
+  if (e.key === '2') sortCards('views');
+  if (e.key === '3') sortCards('name');
+});

@@ -1,4 +1,4 @@
-{{! ── GA4 Live Navbar ─────────────────────────────────────────── }}
+{{! ── Pulseboard Navbar ────────────────────────────────────────── }}
 <nav id="appNav">
     <div class="nav-inner">
         <a class="nav-brand" href="/">
@@ -6,7 +6,7 @@
                 stroke-linecap="round" stroke-linejoin="round" style="color:var(--nav-accent)">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
-            <span class="nav-brand-text"><span style="color:var(--nav-accent)">GA4</span> Live</span>
+            <span class="nav-brand-text"><span style="color:var(--nav-accent)">Pulse</span>board</span>
         </a>
         <div class="nav-links" id="navLinks">
             <a class="nav-link" href="/" id="nlDash">
@@ -265,7 +265,7 @@
 <script>
     (function () {
         var root = document.documentElement;
-        var THEME_KEY = 'ga4_theme';
+        var THEME_KEY = 'pb_theme';
         var saved = localStorage.getItem(THEME_KEY) || 'light';
         applyTheme(saved);
         function applyTheme(t) {
