@@ -202,7 +202,7 @@ async function batchRealtimeReport({
                         url: property.url,
                         activeUsers: 0,
                         pageViews: 0,
-                        dashboardUrl: `https://analytics.google.com/analytics/web/#/p${property.id}/reports/reportinghub`,
+                        dashboardUrl: `https://analytics.google.com/analytics/web/#/a${property.id}/reports/intelligenthome`,
                     };
                 }
 
@@ -224,7 +224,7 @@ async function batchRealtimeReport({
                     url: property.url,
                     activeUsers: totalActiveUsers,
                     pageViews: totalPageViews,
-                    dashboardUrl: `https://analytics.google.com/analytics/web/#/p${property.id}/reports/reportinghub`,
+                    dashboardUrl: `https://analytics.google.com/analytics/web/#/a${property.id}/reports/intelligenthome`,
                 };
             } catch (error) {
                 if (error.code === 7) {
@@ -246,7 +246,7 @@ async function batchRealtimeReport({
                     activeUsers: 0,
                     pageViews: 0,
                     errorMessage: error.details || error.message,
-                    dashboardUrl: `https://analytics.google.com/analytics/web/#/p${property.id}/reports/reportinghub`,
+                    dashboardUrl: `https://analytics.google.com/analytics/web/#/a${property.id}/reports/intelligenthome`,
                 };
             }
         }),
