@@ -11,6 +11,8 @@ const CACHE_TTL_HOURS = 12;
 
 /** Latest property quota snapshot – updated on every realtime batch fetch */
 let latestQuota = null;
+let analyticsAdminClient = null;
+const propertyCurrencyMemCache = new Map();
 
 /** In-memory realtime cache – prevents re-fetching on every page reload */
 const REALTIME_MEM_TTL = 2 * 60 * 1000; // 2 minutes
@@ -75,10 +77,7 @@ async function savePropertiesToCache(properties) {
 // ---------------------------------------------------------------------------
 
 async function getAnalyticsProperties(credentialsJsonPath) {
-    const { AnalyticsAdminServiceClient } = require("@google-analytics/admin");
-    const analyticsAdmin = new AnalyticsAdminServiceClient({
-        keyFilename: credentialsJsonPath,
-    });
+    const analyticsAdmin = getAnalyticsAdminClient(credentialsJsonPath);
 
     const [accounts] = await analyticsAdmin.listAccounts();
     if (!accounts || accounts.length === 0) throw new Error("No accounts found");
@@ -106,6 +105,7 @@ async function getAnalyticsProperties(credentialsJsonPath) {
                 site: p.displayName,
                 url: null,
                 domain: null,
+                currencyCode: p.currencyCode || null,
             }));
 
         allProperties = [...allProperties, ...formatted];
@@ -133,6 +133,51 @@ async function getAnalyticsProperties(credentialsJsonPath) {
     );
 
     return enriched;
+}
+
+function getAnalyticsAdminClient(credentialsJsonPath = CREDENTIALS_PATH) {
+    if (!analyticsAdminClient) {
+        const { AnalyticsAdminServiceClient } = require("@google-analytics/admin");
+        analyticsAdminClient = new AnalyticsAdminServiceClient({
+            keyFilename: credentialsJsonPath,
+        });
+    }
+    return analyticsAdminClient;
+}
+
+async function getPropertyCurrencyCode(
+    propertyId,
+    credentialsJsonPath = CREDENTIALS_PATH,
+) {
+    if (!propertyId) return "USD";
+
+    if (propertyCurrencyMemCache.has(propertyId)) {
+        return propertyCurrencyMemCache.get(propertyId);
+    }
+
+    const cache = await getCachedProperties();
+    const cachedProperty = (cache?.properties || []).find(
+        (prop) => String(prop.id) === String(propertyId),
+    );
+    if (cachedProperty?.currencyCode) {
+        propertyCurrencyMemCache.set(propertyId, cachedProperty.currencyCode);
+        return cachedProperty.currencyCode;
+    }
+
+    try {
+        const analyticsAdmin = getAnalyticsAdminClient(credentialsJsonPath);
+        const [property] = await analyticsAdmin.getProperty({
+            name: `properties/${propertyId}`,
+        });
+        const currencyCode = property?.currencyCode || "USD";
+        propertyCurrencyMemCache.set(propertyId, currencyCode);
+        return currencyCode;
+    } catch (err) {
+        console.warn(
+            `[analytics-card] currency lookup failed for ${propertyId}: ${err.message}`,
+        );
+        return "USD";
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -753,13 +798,15 @@ const CARD_CONFIGS = {
     },
     "revenue-by-date": {
         dimensions: ["date"],
-        metrics:    ["purchaseRevenue", "transactions"],
+        metrics:    ["totalRevenue", "totalAdRevenue"],
+        fallbackMetrics: ["purchaseRevenue"],
         limit:      28,
         timeSeries: true,
     },
     "revenue-by-source": {
         dimensions: ["sessionSource", "sessionMedium"],
-        metrics:    ["purchaseRevenue", "transactions"],
+        metrics:    ["totalRevenue", "totalAdRevenue"],
+        fallbackMetrics: ["purchaseRevenue"],
         limit:      10,
     },
 };
@@ -777,23 +824,52 @@ exports.analyticsCard = async (req, res) => {
         ? (range === "today" ? 1 : range === "7d" ? 7 : 28)
         : cfg.limit;
 
-    // Time-series cards: order by date asc; all others: order by first metric desc
-    const orderBys = cfg.timeSeries
-        ? [{ dimension: { dimensionName: "date" }, desc: false }]
-        : [{ metric: { metricName: cfg.metrics[0] }, desc: true }];
-
     try {
         const { BetaAnalyticsDataClient } = require("@google-analytics/data");
         const client = new BetaAnalyticsDataClient({ keyFilename: CREDENTIALS_PATH });
+        const currencyCode = await getPropertyCurrencyCode(propertyId);
 
-        const [response] = await client.runReport({
-            property:   `properties/${propertyId}`,
-            dimensions: cfg.dimensions.map(name => ({ name })),
-            metrics:    cfg.metrics.map(name => ({ name })),
-            dateRanges: [dateRange],
-            limit,
-            orderBys,
-        });
+        const metricSets = [cfg.metrics];
+        if (cfg.fallbackMetrics?.length) metricSets.push(cfg.fallbackMetrics);
+
+        let response = null;
+        let metricHeaders = cfg.metrics;
+        let lastMetricError = null;
+
+        for (const metricNames of metricSets) {
+            const orderBys = cfg.timeSeries
+                ? [{ dimension: { dimensionName: "date" }, desc: false }]
+                : [{ metric: { metricName: metricNames[0] }, desc: true }];
+
+            try {
+                [response] = await client.runReport({
+                    property:   `properties/${propertyId}`,
+                    dimensions: cfg.dimensions.map(name => ({ name })),
+                    metrics:    metricNames.map(name => ({ name })),
+                    dateRanges: [dateRange],
+                    limit,
+                    orderBys,
+                });
+                metricHeaders = metricNames;
+                lastMetricError = null;
+                break;
+            } catch (err) {
+                lastMetricError = err;
+                const isRetryableMetricError =
+                    err.code === 3 || /metric|revenue|dimension/i.test(err.message || "");
+                const isLastMetricSet = metricNames === metricSets[metricSets.length - 1];
+
+                if (!isRetryableMetricError || isLastMetricSet) {
+                    throw err;
+                }
+
+                console.warn(
+                    `[analytics-card] ${type}: ${err.message}. Retrying with fallback metrics.`,
+                );
+            }
+        }
+
+        if (!response && lastMetricError) throw lastMetricError;
 
         const rows = (response.rows || []).map(row => ({
             dims:    row.dimensionValues.map(d => d.value),
@@ -809,7 +885,8 @@ exports.analyticsCard = async (req, res) => {
             ok: true, type, rows, totals, range,
             timeSeries: !!cfg.timeSeries,
             dimensionHeaders: cfg.dimensions,
-            metricHeaders:    cfg.metrics,
+            metricHeaders,
+            currencyCode,
         });
     } catch (err) {
         console.error(`[analytics-card] ${type}:`, err.message);

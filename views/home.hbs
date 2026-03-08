@@ -370,6 +370,10 @@
       box-shadow 180ms ease;
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 188px;
   }
 
   .prop-card.revealed {
@@ -392,9 +396,9 @@
 
   .prop-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
-    margin-bottom: 14px;
+    margin-bottom: 0;
   }
 
   .prop-favicon-wrap {
@@ -419,10 +423,40 @@
   .prop-name {
     font-size: 13px;
     font-weight: 700;
-    flex: 1;
-    white-space: nowrap;
+    line-height: 1.35;
+    min-width: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: normal;
+  }
+
+  .prop-main {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .prop-sub {
+    font-size: 10px;
+    color: var(--xmuted);
+    font-family: var(--mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .prop-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    padding-top: 2px;
   }
 
   .prop-link-btn {
@@ -468,21 +502,31 @@
   }
 
   .prop-stats {
-    display: flex;
-    gap: 20px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--card-bdr);
   }
 
   .prop-stat {
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    padding: 12px 12px 10px;
+    border-radius: 8px;
+    background: #faf7f1;
+    border: 1px solid rgba(24, 24, 28, 0.04);
   }
 
   .prop-stat-num {
     font-family: var(--mono);
-    font-size: 28px;
+    font-size: 24px;
     line-height: 1;
     color: var(--text);
     letter-spacing: -.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .prop-stat-num.green {
@@ -693,6 +737,36 @@
   [data-theme="dark"] .prop-error-tag {
     background: rgba(239,68,68,0.12);
   }
+  [data-theme="dark"] .prop-stat {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.06);
+  }
+
+  @media (max-width: 900px) {
+    .dash-wrap {
+      padding: 0 16px 40px;
+    }
+    .dash-hdr,
+    .quota-panel {
+      padding: 20px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .dash-grid {
+      grid-template-columns: 1fr;
+    }
+    .prop-card {
+      padding: 16px;
+      min-height: 0;
+    }
+    .prop-stats {
+      gap: 8px;
+    }
+    .kbd-hint-bar {
+      display: none;
+    }
+  }
 </style>
 
 {{!-- ────────────────────────────────────────────────────── --}}
@@ -794,22 +868,27 @@
                 </svg>
               </div>
             </div>
-<span class="prop-name">{{this.siteName}}</span>
+          <div class="prop-main">
+            <span class="prop-name">{{this.siteName}}</span>
+            <span class="prop-sub">{{#if this.domain}}{{this.domain}}{{else}}Property {{this.propertyId}}{{/if}}</span>
+          </div>
 
-{{#if this.activeUsers}}
-<div class="live-dot" title="{{this.activeUsers}} active user(s)"></div>
-{{/if}}
+          <div class="prop-actions">
+            {{#if this.activeUsers}}
+            <div class="live-dot" title="{{this.activeUsers}} active user(s)"></div>
+            {{/if}}
 
-{{#unless this.error}}
-<a class="prop-link-btn" href="{{this.dashboardUrl}}" target="_blank" rel="noopener noreferrer"
-  onclick="event.stopPropagation()" title="Open property dashboard">
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    <polyline points="15 3 21 3 21 9" />
-    <line x1="10" y1="14" x2="21" y2="3" />
-  </svg>
-        </a>
-        {{/unless}}
+            {{#unless this.error}}
+            <a class="prop-link-btn" href="{{this.dashboardUrl}}" target="_blank" rel="noopener noreferrer"
+              onclick="event.stopPropagation()" title="Open property dashboard">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </a>
+            {{/unless}}
+          </div>
         </div>
         
         <div class="prop-stats">

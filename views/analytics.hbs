@@ -216,8 +216,9 @@
     /* Widget grid */
     .an-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
         gap: 16px;
+        align-items: start;
     }
 
     .an-card.wide {
@@ -231,11 +232,13 @@
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        min-width: 0;
+        min-height: 320px;
     }
 
     .an-card-head {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 10px;
         padding: 13px 16px;
         border-bottom: 1px solid var(--a-bdr);
@@ -256,18 +259,26 @@
         font-size: 12px;
         font-weight: 700;
         letter-spacing: .04em;
-        color: var(--a-text)
+        color: var(--a-text);
+        line-height: 1.2
     }
 
     .an-card-meta {
         font-size: 10px;
         color: var(--a-muted);
-        margin-top: 1px
+        margin-top: 1px;
+        line-height: 1.35
+    }
+
+    .an-card-copy {
+        min-width: 0;
+        flex: 1;
     }
 
     .an-card-body {
         padding: 12px 16px;
         flex: 1;
+        min-height: 236px;
         max-height: 360px;
         overflow-y: auto;
     }
@@ -288,14 +299,15 @@
     .an-card.chart-card .an-card-body {
         max-height: 300px;
         overflow-y: visible;
-        padding: 16px
+        padding: 16px;
+        min-height: 0
     }
 
     /* Bar rows */
     .an-row {
         display: flex;
-        align-items: center;
-        gap: 8px;
+        align-items: flex-start;
+        gap: 10px;
         padding: 5px 0;
         border-bottom: 1px solid rgba(128, 128, 128, 0.07);
     }
@@ -304,17 +316,35 @@
         border-bottom: none
     }
 
-    .an-row-label {
+    .an-row-main {
+        min-width: 0;
         flex: 1;
+        display: grid;
+        gap: 6px;
+    }
+
+    .an-row-copy {
+        min-width: 0;
+    }
+
+    .an-row-label {
+        display: block;
         font-size: 11px;
         color: var(--a-text);
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
+    .an-row-sub {
+        font-size: 10px;
+        color: var(--a-xmuted);
+        margin-top: 2px;
+    }
+
     .an-row-bar-wrap {
-        width: 70px;
+        width: 100%;
         height: 5px;
         background: var(--a-bdr);
         border-radius: 3px;
@@ -327,13 +357,29 @@
         transition: width 600ms cubic-bezier(.215, .61, .355, 1)
     }
 
+    .an-row-values {
+        width: 78px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 2px;
+        flex-shrink: 0;
+    }
+
     .an-row-val {
         font-family: var(--a-mono);
         font-size: 11px;
         color: var(--a-muted);
-        width: 58px;
         text-align: right;
+        width: auto;
         flex-shrink: 0
+    }
+
+    .an-row-subval {
+        font-family: var(--a-mono);
+        font-size: 10px;
+        color: var(--a-xmuted);
+        white-space: nowrap;
     }
 
     /* Trend chart */
@@ -351,7 +397,8 @@
         display: flex;
         gap: 16px;
         margin-top: 10px;
-        justify-content: flex-end
+        justify-content: flex-start;
+        flex-wrap: wrap
     }
 
     .an-chart-legend-item {
@@ -618,6 +665,70 @@
             transform: none;
         }
     }
+
+    @media (max-width: 900px) {
+        .an-wrap {
+            padding: 24px 18px 48px
+        }
+
+        .an-header-right {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        .an-picker {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .an-summary {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .an-kbd-hint {
+            display: none;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .an-wrap {
+            padding: 20px 14px 40px
+        }
+
+        .an-header-right,
+        .an-export-bar {
+            display: grid;
+            width: 100%;
+        }
+
+        .an-range-group {
+            width: 100%;
+        }
+
+        .an-range-btn {
+            flex: 1;
+        }
+
+        .an-summary {
+            grid-template-columns: 1fr;
+        }
+
+        .an-card {
+            min-height: 0;
+        }
+
+        .an-card-head,
+        .an-card-body,
+        .an-card.chart-card .an-card-body {
+            padding-left: 14px;
+            padding-right: 14px;
+        }
+
+        .an-row-values {
+            width: auto;
+            min-width: 68px;
+        }
+    }
 </style>
 
 <div id="toastContainer"></div>
@@ -696,7 +807,7 @@
         </div>
         <div class="an-stat-card">
             <div class="an-stat-accent" style="background:#f59e0b"></div>
-            <div class="an-stat-label">Revenue</div>
+            <div class="an-stat-label">Total Revenue</div>
             <div class="an-stat-num" id="sumRevenue">—</div>
             <div class="an-stat-sub" id="sumRevenueSub">—</div>
         </div>
@@ -724,6 +835,9 @@
 </div>
 
 <script>
+    const PROPERTIES = {{{ json_stringify properties }}};
+    const PROPERTY_META = Object.fromEntries((PROPERTIES || []).map(prop => [String(prop.id), prop]));
+
     /* ─── Toast system ───────────────────────────────────────────────── */
     function toast(msg, icon) {
         const c = document.getElementById('toastContainer');
@@ -749,7 +863,7 @@
         }
         const card = CARDS.find(c => c.type === type);
         const name = card ? card.title : type;
-        const headers = ['Dimension', ...(data.metricHeaders || ['Value'])];
+        const headers = ['Dimension', ...((data.metricHeaders || ['Value']).map(metricLabel))];
         const csvRows = [headers.join(',')];
         data.rows.forEach(r => {
             const dims = (r.dims || []).join(' / ').replace(/,/g, ' ');
@@ -767,7 +881,7 @@
             data.rows.forEach(r => {
                 const dims = (r.dims || []).join(' / ').replace(/,/g, ' ');
                 (r.metrics || []).forEach((v, mi) => {
-                    const metric = (data.metricHeaders || [])[mi] || 'value';
+                    const metric = metricLabel((data.metricHeaders || [])[mi] || 'value');
                     allRows.push(['"' + c.title + '"', '"' + dims + '"', '"' + metric + '"', v ?? 0].join(','));
                 });
             });
@@ -832,12 +946,12 @@
         },
         {
             type: 'revenue-by-date', title: 'Revenue Trend', wide: true, chartCard: true,
-            sub: 'Purchase revenue & transactions over time',
+            sub: 'Total revenue and ad revenue over time',
             color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',
             icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
         },
         {
-            type: 'revenue-by-source', title: 'Revenue by Source', sub: 'Purchase revenue by traffic source',
+            type: 'revenue-by-source', title: 'Revenue by Source', sub: 'Total revenue by traffic source',
             color: '#d97706', bg: 'rgba(217,119,6,0.1)',
             icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
         },
@@ -845,15 +959,47 @@
 
     let currentPropId = '';
     let currentRange = '28d';
+    let currentCurrencyCode = 'USD';
     const RANGE_LABELS = { today: 'Today', '7d': 'Last 7 days', '28d': 'Last 28 days' };
 
     /* ─── Formatting ─────────────────────────────────────────────────── */
-    function fmt(n, currency) {
+    function fmt(n, currency, currencyCode) {
         const v = Math.round((+n || 0) * 100) / 100;
-        if (currency) return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (currency) {
+            try {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: currencyCode || currentCurrencyCode || 'USD',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                }).format(v);
+            } catch {
+                return (currencyCode || currentCurrencyCode || 'USD') + ' ' + v.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                });
+            }
+        }
         if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
         if (v >= 1e3) return (v / 1e3).toFixed(1) + 'k';
         return v.toLocaleString();
+    }
+
+    function metricLabel(metric) {
+        const labels = {
+            sessions: 'Sessions',
+            newUsers: 'New users',
+            screenPageViews: 'Pageviews',
+            eventCount: 'Events',
+            totalRevenue: 'Total revenue',
+            totalAdRevenue: 'Ad revenue',
+            purchaseRevenue: 'Purchase revenue',
+            transactions: 'Transactions',
+        };
+        if (labels[metric]) return labels[metric];
+        return String(metric || 'Value')
+            .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+            .replace(/^./, s => s.toUpperCase());
     }
 
     function skeleton() {
@@ -863,7 +1009,7 @@
 
     /* ─── SVG Trend chart ────────────────────────────────────────────── */
     function renderTrendChart(data, isCurrency) {
-        const { rows, metricHeaders, type } = data;
+        const { rows, metricHeaders, type, currencyCode } = data;
         if (!rows || !rows.length) return '<div class="an-empty">No data for this period.</div>';
 
         const W = 900, H = 200, PAD = { t: 12, r: 12, b: 36, l: isCurrency ? 56 : 42 };
@@ -883,7 +1029,7 @@
         const yGrid = [0, 0.25, 0.5, 0.75, 1].map(f => {
             const v = Math.round(f * maxVal);
             const y = py(v);
-            const lbl = isCurrency ? '$' + fmt(v, true) : fmt(v);
+            const lbl = isCurrency ? fmt(v, true, currencyCode) : fmt(v);
             return '<line x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + y + '" y2="' + y +
                 '" stroke="currentColor" stroke-opacity=".07"/>' +
                 '<text x="' + (PAD.l - 4) + '" y="' + (y + 4) + '" text-anchor="end" font-size="9" fill="currentColor" fill-opacity=".4">' + lbl + '</text>';
@@ -917,13 +1063,13 @@
             const d = r.dims[0];
             const date = d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8);
             const tip = date + '  ·  ' + metricHeaders.map((h, mi) =>
-                h + ': ' + (isCurrency ? '$' + fmt(vals[mi], true) : fmt(vals[mi]))).join('  ·  ');
+                metricLabel(h) + ': ' + (String(h).toLowerCase().includes('revenue') ? fmt(vals[mi], true, currencyCode) : fmt(vals[mi]))).join('  ·  ');
             return '<circle cx="' + px(i) + '" cy="' + py(vals[0]) + '" r="16" fill="transparent"' +
                 ' data-tip="' + tip + '" class="chart-hp"/>';
         }).join('');
 
         const legend = metricHeaders.map((h, i) =>
-            '<div class="an-chart-legend-item"><div class="an-chart-legend-dot" style="background:' + COLORS[i] + '"></div>' + h + '</div>'
+            '<div class="an-chart-legend-item"><div class="an-chart-legend-dot" style="background:' + COLORS[i] + '"></div>' + metricLabel(h) + '</div>'
         ).join('');
 
         return '<div class="an-chart-wrap">' +
@@ -935,20 +1081,35 @@
 
     /* ─── Bar rows ───────────────────────────────────────────────────── */
     function renderBarRows(data) {
-        const { rows, metricHeaders } = data;
+        const { rows, metricHeaders, currencyCode } = data;
         if (!rows || !rows.length) return '<div class="an-empty">No data for this period.</div>';
-        const isCurr = metricHeaders[0] && metricHeaders[0].toLowerCase().includes('revenue');
+        const primaryMetric = metricHeaders[0] || 'value';
+        const secondaryMetric = metricHeaders[1] || '';
+        const isCurr = primaryMetric.toLowerCase().includes('revenue');
         const max = Math.max(...rows.map(r => r.metrics[0] || 0));
         const COLORS = ['#e8562a', '#3b82f6', '#059669', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#d97706', '#6366f1'];
         return rows.map((r, i) => {
             const label = r.dims.join(' / ');
-            const val = r.metrics[0];
+            const val = r.metrics[0] || 0;
+            const secondaryVal = r.metrics[1] || 0;
             const pct = max ? Math.round((val / max) * 100) : 0;
-            const valStr = isCurr ? '$' + fmt(val, true) : fmt(val);
+            const valStr = isCurr ? fmt(val, true, currencyCode) : fmt(val);
+            const secondaryIsCurrency = secondaryMetric.toLowerCase().includes('revenue');
+            const secondaryText = secondaryMetric
+                ? metricLabel(secondaryMetric) + ' ' + (secondaryIsCurrency ? fmt(secondaryVal, true, currencyCode) : fmt(secondaryVal))
+                : '';
             return '<div class="an-row">' +
+                '<div class="an-row-main">' +
+                '<div class="an-row-copy">' +
                 '<span class="an-row-label" title="' + label + '">' + label + '</span>' +
+                (secondaryText ? '<div class="an-row-sub">' + secondaryText + '</div>' : '') +
+                '</div>' +
                 '<div class="an-row-bar-wrap"><div class="an-row-bar" style="width:' + pct + '%;background:' + COLORS[i % COLORS.length] + '"></div></div>' +
-                '<span class="an-row-val">' + valStr + '</span></div>';
+                '</div>' +
+                '<div class="an-row-values">' +
+                '<span class="an-row-val">' + valStr + '</span>' +
+                (secondaryText ? '<span class="an-row-subval">' + (secondaryIsCurrency ? fmt(secondaryVal, true, currencyCode) : fmt(secondaryVal)) + '</span>' : '') +
+                '</div></div>';
         }).join('');
     }
 
@@ -964,6 +1125,7 @@
     function buildGrid(propId) {
         const grid = document.getElementById('anGrid');
         const exportCsvIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+        Object.keys(cardDataStore).forEach(key => delete cardDataStore[key]);
 
         grid.innerHTML = CARDS.map(c => {
             const cls = 'an-card' + (c.wide ? ' wide' : '') + (c.chartCard ? ' chart-card' : '');
@@ -971,7 +1133,7 @@
                 '<div class="an-card-head">' +
                 '<div class="an-card-icon" style="background:' + c.bg + '">' +
                 '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="' + c.color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + c.icon + '</svg></div>' +
-                '<div><div class="an-card-title">' + c.title + '</div><div class="an-card-meta">' + c.sub + '</div></div>' +
+                '<div class="an-card-copy"><div class="an-card-title">' + c.title + '</div><div class="an-card-meta">' + c.sub + '</div></div>' +
                 '<div class="an-card-actions">' +
                 '<button class="an-act-btn" title="Export CSV" onclick="exportCardCsv(\'' + c.type + '\')">' + exportCsvIcon + '</button>' +
                 '</div>' +
@@ -989,6 +1151,7 @@
                     const el = document.getElementById('body-' + c.type);
                     if (!el) return;
                     if (data.error) { el.innerHTML = '<div class="an-error">&#9888; ' + data.error + '</div>'; return; }
+                    if (data.currencyCode) currentCurrencyCode = data.currencyCode;
                     // Store data for CSV export
                     cardDataStore[c.type] = data;
                     el.innerHTML = renderCardBody(data);
@@ -998,7 +1161,14 @@
                     if (c.type === 'browsers') { document.getElementById('sumNewUsers').textContent = fmt(data.totals[0]); document.getElementById('sumNewUsersSub').textContent = rl; showSum(); }
                     if (c.type === 'page-paths') { document.getElementById('sumPageviews').textContent = fmt(data.totals[0]); document.getElementById('sumPageviewsSub').textContent = rl; showSum(); }
                     if (c.type === 'events') { document.getElementById('sumEvents').textContent = fmt(data.totals[0]); document.getElementById('sumEventsSub').textContent = rl; showSum(); }
-                    if (c.type === 'revenue-by-date') { document.getElementById('sumRevenue').textContent = '$' + fmt(data.totals[0], true); document.getElementById('sumRevenueSub').textContent = rl; showSum(); }
+                    if (c.type === 'revenue-by-date') {
+                        const totalRevenue = data.totals[0] || 0;
+                        const totalAdRevenue = data.totals[1] || 0;
+                        document.getElementById('sumRevenue').textContent = fmt(totalRevenue, true, data.currencyCode);
+                        document.getElementById('sumRevenueSub').textContent =
+                            totalAdRevenue > 0 ? rl + ' · Ad ' + fmt(totalAdRevenue, true, data.currencyCode) : rl;
+                        showSum();
+                    }
                 })
                 .catch(() => {
                     const el = document.getElementById('body-' + c.type);
@@ -1063,6 +1233,7 @@
             document.getElementById('anSubLabel').textContent = 'Select a property to begin';
             return;
         }
+        currentCurrencyCode = PROPERTY_META[currentPropId]?.currencyCode || 'USD';
         document.getElementById('anSubLabel').textContent = (RANGE_LABELS[currentRange] || currentRange) + ' · non-realtime';
         buildGrid(currentPropId);
         loadLiveStats(currentPropId);
