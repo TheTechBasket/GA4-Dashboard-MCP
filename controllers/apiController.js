@@ -814,6 +814,9 @@ const CARD_CONFIGS = {
 /** GET /api/analytics-card/:propertyId/:type?range=today|7d|28d */
 exports.analyticsCard = async (req, res) => {
     const { propertyId, type } = req.params;
+    if (!propertyId || !/^\d+$/.test(propertyId)) {
+        return res.status(400).json({ error: "Invalid propertyId" });
+    }
     const range  = req.query.range || "28d";
     const cfg    = CARD_CONFIGS[type];
     if (!cfg) return res.status(400).json({ error: `Unknown card type: ${type}` });
@@ -900,6 +903,9 @@ exports.realtimeSummary = (req, res) => {
         return res.json({ ok: false, message: "No realtime data cached. Load the dashboard first." });
     }
     const { propertyId } = req.params;
+    if (!propertyId || !/^\d+$/.test(propertyId)) {
+        return res.status(400).json({ error: "Invalid propertyId" });
+    }
     const prop = (realtimeMemCache.data || []).find(r => String(r.propertyId) === String(propertyId));
     if (!prop) return res.json({ ok: false, message: "Property not in cache" });
     res.json({

@@ -838,6 +838,16 @@
     const PROPERTIES = {{{ json_stringify properties }}};
     const PROPERTY_META = Object.fromEntries((PROPERTIES || []).map(prop => [String(prop.id), prop]));
 
+    /* ─── XSS-safe text escape ───────────────────────────────────────── */
+    function escHtml(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     /* ─── Toast system ───────────────────────────────────────────────── */
     function toast(msg, icon) {
         const c = document.getElementById('toastContainer');
@@ -1065,7 +1075,7 @@
             const tip = date + '  ·  ' + metricHeaders.map((h, mi) =>
                 metricLabel(h) + ': ' + (String(h).toLowerCase().includes('revenue') ? fmt(vals[mi], true, currencyCode) : fmt(vals[mi]))).join('  ·  ');
             return '<circle cx="' + px(i) + '" cy="' + py(vals[0]) + '" r="16" fill="transparent"' +
-                ' data-tip="' + tip + '" class="chart-hp"/>';
+                ' data-tip="' + escHtml(tip) + '" class="chart-hp"/>';
         }).join('');
 
         const legend = metricHeaders.map((h, i) =>
@@ -1101,14 +1111,14 @@
             return '<div class="an-row">' +
                 '<div class="an-row-main">' +
                 '<div class="an-row-copy">' +
-                '<span class="an-row-label" title="' + label + '">' + label + '</span>' +
-                (secondaryText ? '<div class="an-row-sub">' + secondaryText + '</div>' : '') +
+                '<span class="an-row-label" title="' + escHtml(label) + '">' + escHtml(label) + '</span>' +
+                (secondaryText ? '<div class="an-row-sub">' + escHtml(secondaryText) + '</div>' : '') +
                 '</div>' +
                 '<div class="an-row-bar-wrap"><div class="an-row-bar" style="width:' + pct + '%;background:' + COLORS[i % COLORS.length] + '"></div></div>' +
                 '</div>' +
                 '<div class="an-row-values">' +
-                '<span class="an-row-val">' + valStr + '</span>' +
-                (secondaryText ? '<span class="an-row-subval">' + (secondaryIsCurrency ? fmt(secondaryVal, true, currencyCode) : fmt(secondaryVal)) + '</span>' : '') +
+                '<span class="an-row-val">' + escHtml(valStr) + '</span>' +
+                (secondaryText ? '<span class="an-row-subval">' + escHtml(secondaryIsCurrency ? fmt(secondaryVal, true, currencyCode) : fmt(secondaryVal)) + '</span>' : '') +
                 '</div></div>';
         }).join('');
     }
@@ -1150,7 +1160,7 @@
                 .then(data => {
                     const el = document.getElementById('body-' + c.type);
                     if (!el) return;
-                    if (data.error) { el.innerHTML = '<div class="an-error">&#9888; ' + data.error + '</div>'; return; }
+                    if (data.error) { el.innerHTML = '<div class="an-error">&#9888; ' + escHtml(data.error) + '</div>'; return; }
                     if (data.currencyCode) currentCurrencyCode = data.currencyCode;
                     // Store data for CSV export
                     cardDataStore[c.type] = data;

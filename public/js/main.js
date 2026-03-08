@@ -218,6 +218,15 @@ function flagEmoji(id) {
   return String.fromCodePoint(...[...id.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0)));
 }
 
+function escHtmlMain(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderDetail(pid, data) {
   const el = document.getElementById(`cd-${pid}`);
   if (!el) return;
@@ -238,13 +247,13 @@ function renderDetail(pid, data) {
   const countriesHtml = data.countries?.length ? `
     <div class="cd-section">
       <div class="cd-title">Countries</div>
-      ${rows(data.countries, 'users', r => `${flagEmoji(r.id)} ${r.name}`)}
+      ${rows(data.countries, 'users', r => `${flagEmoji(r.id)} ${escHtmlMain(r.name)}`)}
     </div>` : '';
 
   const eventsHtml = data.events?.length ? `
     <div class="cd-section">
       <div class="cd-title">Top Events</div>
-      ${rows(data.events, 'users', r => r.name || '(unknown)')}
+      ${rows(data.events, 'users', r => escHtmlMain(r.name || '(unknown)'))}
     </div>` : '';
 
   const pagesHtml = data.pages?.length ? `
@@ -254,7 +263,7 @@ function renderDetail(pid, data) {
         const pct = Math.round(r.views / Math.max(1, ...data.pages.map(x => x.views)) * 100);
         return `
           <div class="cd-row">
-            <span class="cd-page" title="${r.path}">${r.path}</span>
+            <span class="cd-page" title="${escHtmlMain(r.path)}">${escHtmlMain(r.path)}</span>
             <div class="cd-bar-wrap"><div class="cd-bar" style="width:${pct}%"></div></div>
             <span class="cd-num">${r.views}</span>
           </div>`;
@@ -285,7 +294,9 @@ async function loadCardDetail(pid) {
       detailCache[pid] = json;
       renderDetail(pid, json);
     } else {
-      detailEl.innerHTML = `<div class="cd-loading" style="color:var(--danger)">${json.error || 'Error loading data'}</div>`;
+      detailEl.textContent = json.error || 'Error loading data';
+      detailEl.style.color = 'var(--danger)';
+      detailEl.className = 'cd-loading';
     }
   } catch {
     detailEl.innerHTML = '<div class="cd-loading" style="color:var(--danger)">Network error</div>';

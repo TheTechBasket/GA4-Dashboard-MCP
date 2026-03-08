@@ -168,3 +168,6 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+
+### Google service account credentials – never commit real keys ###
+ga4dataapi-*.json

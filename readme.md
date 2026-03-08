@@ -3,7 +3,8 @@
 
 * Clone repo
 * run `npm install` to install all dependency
-* make sure to not leak secret .json file included in repo
+* Copy `ga4dataapi.example.json` to `ga4dataapi-<your-key-id>.json` and fill in your Google service account credentials — **never commit the real key file**
+* Update `CREDENTIALS_PATH` in `controllers/apiController.js` if you rename the file
 * and finally run `npm run dev` to access web page on localhost:3000
 ![alt text](https://github.com/TheTechBasket/GA4_report/blob/master/screenshot.jpg?raw=true)
 
