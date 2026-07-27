@@ -1,0 +1,38 @@
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+		{{!-- Google Fonts: DM Mono (data), Syne (headings/labels) --}}
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@400;500;600;700;800&display=swap"
+			rel="stylesheet" />
+
+		<link rel="stylesheet" href="/css/main.css" />
+
+		{{!-- Meta Tags added with context --}}
+		 {{>metatags head}}
+
+	</head>
+
+
+		{{!-- flex flex-col min-h-screen is used to move footer at the bottom of the page --}}
+  	<body
+		class="bg-gray-100 flex flex-col min-h-screen" >
+    		 {{> navbar }}
+			{{> debugResponsive}}
+
+		<div
+			class="container mx-auto p-5 mb-auto">
+			{{{body}}}
+  		</div>
+
+
+			 {{> footer }}
+		<script src="/js/main.js"></script>
+	</body>
+
+
+</html>

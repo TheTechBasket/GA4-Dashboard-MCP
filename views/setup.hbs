@@ -1,0 +1,107 @@
+<style>
+  :root {
+    --card-bg: #ffffff;
+    --card-bdr: #cccfd3;
+    --accent: #1348dc;
+    --amber: #d97706;
+    --text: #3a3d43;
+    --muted: #5d636f;
+    --xmuted: #878a98;
+  }
+  [data-theme="dark"] {
+    --card-bg: #1a1a22;
+    --card-bdr: rgba(255, 255, 255, 0.08);
+    --text: #e4e2dd;
+    --muted: #8a8890;
+    --xmuted: #5a5870;
+  }
+
+  .setup-wrap { max-width: 640px; margin: 40px auto; color: var(--text); }
+  .setup-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .setup-head svg { flex-shrink: 0; color: var(--amber); }
+  .setup-head h1 { font-size: 22px; font-weight: 700; margin: 0; }
+  .setup-sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .setup-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .setup-step {
+    display: flex; gap: 14px; padding: 16px 18px; border: 1px solid var(--card-bdr); border-radius: 8px;
+    background: var(--card-bg); opacity: 0; transform: translateY(6px);
+    animation: setupIn 260ms cubic-bezier(0.215,0.61,0.355,1) forwards;
+  }
+  .setup-step + .setup-step { margin-top: 10px; }
+  .setup-step-num {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff;
+    font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+  .setup-step-body strong { display: block; font-size: 14px; margin-bottom: 4px; color: var(--text); }
+  .setup-step-body p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .setup-step-body code {
+    background: rgba(128,128,128,0.14); padding: 1px 6px; border-radius: 4px; font-size: 12px; word-break: break-all;
+  }
+  .setup-step-body a { color: var(--accent); text-decoration: none; }
+  .setup-step-body a:hover { text-decoration: underline; }
+  .setup-foot { margin-top: 24px; font-size: 12px; color: var(--xmuted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .setup-step { animation: none; opacity: 1; transform: none; }
+  }
+  @keyframes setupIn { to { opacity: 1; transform: translateY(0); } }
+</style>
+
+<div class="setup-wrap">
+  <div class="setup-head">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+    <h1>No GA4 service account key found</h1>
+  </div>
+  <p class="setup-sub">Pulseboard needs a Google service account key to read your GA4 properties. Follow these steps once, then restart the server.</p>
+
+  <ol class="setup-steps">
+    <li class="setup-step" style="animation-delay:0ms">
+      <span class="setup-step-num">1</span>
+      <div class="setup-step-body">
+        <strong>Create a Google Cloud service account</strong>
+        <p>In <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener">Google Cloud Console → IAM &amp; Admin → Service Accounts</a>, create a service account (or reuse one), then enable the <strong>Google Analytics Data API</strong> and <strong>Google Analytics Admin API</strong> for that project.</p>
+      </div>
+    </li>
+    <li class="setup-step" style="animation-delay:60ms">
+      <span class="setup-step-num">2</span>
+      <div class="setup-step-body">
+        <strong>Download a JSON key</strong>
+        <p>On the service account's <em>Keys</em> tab, add a key → JSON. This downloads a file like <code>ga4dataapi-a1b2c3.json</code>.</p>
+      </div>
+    </li>
+    <li class="setup-step" style="animation-delay:120ms">
+      <span class="setup-step-num">3</span>
+      <div class="setup-step-body">
+        <strong>Grant the service account access to your GA4 property</strong>
+        <p>In GA4 → Admin → Property Access Management, add the service account's email (ends in <code>@...iam.gserviceaccount.com</code>) as a <strong>Viewer</strong>.</p>
+      </div>
+    </li>
+    <li class="setup-step" style="animation-delay:180ms">
+      <span class="setup-step-num">4</span>
+      <div class="setup-step-body">
+        <strong>Place the key file</strong>
+        <p>Copy the downloaded <code>ga4dataapi-*.json</code> into the project root, next to <code>app.js</code>. (Or set <code>GA4_CREDENTIALS_PATH</code> in your <code>.env</code> to point at it from anywhere.)</p>
+      </div>
+    </li>
+    <li class="setup-step" style="animation-delay:240ms">
+      <span class="setup-step-num">5</span>
+      <div class="setup-step-body">
+        <strong>Restart the server</strong>
+        <p>Stop and re-run <code>pnpm dev</code> (or <code>pnpm start</code>). Pulseboard will pick up the key automatically on the next request.</p>
+      </div>
+    </li>
+    <li class="setup-step" style="animation-delay:300ms">
+      <span class="setup-step-num">6</span>
+      <div class="setup-step-body">
+        <strong>Optional: the MCP server</strong>
+        <p>This project also ships a standalone GA4 MCP server in <code>mcp-server/</code> for use with Claude/other MCP clients — it's separate from the dashboard above and needs its own credentials. It does <em>not</em> read a JSON key file directly: set <code>GOOGLE_APPLICATION_CREDENTIALS</code> (path to a key, e.g. the same <code>ga4dataapi-*.json</code> from step 4) or <code>GA_SERVICE_ACCOUNT_JSON</code> (the key inline) as an env var, then <code>cd mcp-server &amp;&amp; npm install</code>. See <code>mcp-server/README.md</code> for the full setup. Skip this step if you only want the web dashboard.</p>
+      </div>
+    </li>
+  </ol>
+
+  <p class="setup-foot">Key files matching <code>ga4dataapi-*.json</code> in the project root are already git-ignored — safe to drop in directly.</p>
+</div>

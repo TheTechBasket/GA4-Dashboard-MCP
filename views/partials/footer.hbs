@@ -1,0 +1,131 @@
+<footer id="appFooter">
+  <div class="footer-inner">
+    <a class="footer-brand" href="/">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+        stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+      </svg>
+      <span>Pulseboard</span>
+    </a>
+    <div class="footer-links">
+      <a href="/">Dashboard</a>
+      <a href="/globe">Globe</a>
+      <a href="/analytics">Analytics</a>
+    </div>
+    <span class="footer-copy">&copy; {{currentYear}} Pulseboard</span>
+  </div>
+</footer>
+
+<style>
+  /* ── Footer: Zed/DESIGN.md tokens ──────────────────────────── */
+  :root {
+    --f-bdr: #e5e7eb;
+    --f-text: #3a3d43;
+    --f-link: #5d636f;
+    --f-muted: #878a98;
+    --f-accent: #1348dc;
+    --f-sans: 'Inter', 'IBM Plex Sans', system-ui, sans-serif;
+    --f-serif: 'Plex Serif', Georgia, serif;
+    --f-radius: 2px;
+  }
+
+  [data-theme="dark"] {
+    --f-bdr: rgba(255, 255, 255, 0.08);
+    --f-text: #e4e2dd;
+    --f-link: #8a8890;
+    --f-muted: #5a5870;
+    --f-accent: #2b7fff;
+  }
+
+  #appFooter {
+    border-top: 1px solid var(--f-bdr);
+    padding: 28px 20px;
+    font-family: var(--f-sans);
+    background: transparent;
+    transition: border-color 200ms ease;
+  }
+
+  .footer-inner {
+    max-width: 1340px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .footer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--f-serif);
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--f-accent);
+    text-decoration: none;
+    letter-spacing: -0.02em;
+    transition: color 200ms ease;
+  }
+
+  .footer-brand svg {
+    color: var(--f-accent);
+    flex-shrink: 0;
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 24px;
+  }
+
+  .footer-links a {
+    font-family: var(--f-sans);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    color: var(--f-link);
+    text-decoration: none;
+    padding: 4px 6px;
+    border-radius: var(--f-radius);
+    transition: color 150ms ease, background 150ms ease;
+  }
+
+  .footer-links a:hover {
+    color: var(--f-accent);
+    background: #e6effe;
+  }
+
+  .footer-copy {
+    font-family: var(--f-sans);
+    font-size: 12px;
+    color: var(--f-muted);
+    letter-spacing: -0.025em;
+  }
+
+  @media (max-width: 640px) {
+    #appFooter {
+      padding: 20px 16px;
+    }
+
+    .footer-inner {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .footer-links {
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a {
+      font-size: 12px;
+      padding: 6px 8px;
+    }
+  }
+
+  /* ── Dark mode overrides ── */
+  [data-theme="dark"] .footer-links a:hover {
+    background: rgba(43, 127, 255, 0.12);
+  }
+</style>

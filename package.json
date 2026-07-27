@@ -1,0 +1,56 @@
+{
+  "name": "ga4-dashboard-and-mcp",
+  "version": "1.0.0",
+  "description": "GA4 Dashboard & MCP — real-time Google Analytics 4 dashboard featuring 3D globe visualization, traffic spike detection, visitor insights, and an embedded MCP server.",
+  "main": "app.js",
+  "scripts": {
+    "dev": "nodemon",
+    "build": "tsc",
+    "css": "npx tailwindcss -i ./public/css/main.scss -o ./public/css/main.css --watch",
+    "start": "node app.js",
+    "test": "mocha test/**/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TheTechBasket/GA4_report.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TheTechBasket/GA4_report/issues"
+  },
+  "homepage": "https://github.com/TheTechBasket/GA4_report#readme",
+  "author": "Amit Yadav",
+  "license": "MIT",
+  "dependencies": {
+    "@google-analytics/admin": "^7.6.0",
+    "@google-analytics/data": "^2.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-handlebars": "^6.0.7",
+    "google-auth-library": "^7.14.1",
+    "google-gax": "^2.30.5",
+    "http": "0.0.1-security",
+    "lint": "^0.7.0",
+    "morgan": "^1.10.0",
+    "open": "^8.4.2",
+    "server-destroy": "^1.0.1",
+    "url": "^0.11.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.9",
+    "@tailwindcss/line-clamp": "^0.3.1",
+    "@tailwindcss/typography": "^0.5.15",
+    "@types/node": "^25.3.3",
+    "c8": "^7.14.0",
+    "chai": "^4.5.0",
+    "connect-livereload": "^0.6.1",
+    "livereload": "^0.10.3",
+    "mocha": "^8.4.0",
+    "nodemon": "^2.0.22",
+    "prettier": "^2.8.8",
+    "prettier-plugin-tailwindcss": "^0.1.13",
+    "tailwindcss": "^3.4.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
