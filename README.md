@@ -2,6 +2,17 @@
 
 Real-time Google Analytics 4 (GA4) dashboard featuring a 3D interactive globe visualization, traffic spike detection, visitor insights, and a standalone Model Context Protocol (MCP) server for AI assistants.
 
+![GA4 Dashboard & MCP screenshot](ss/ss_1785120214.webp)
+
+<details>
+<summary>More screenshots</summary>
+
+![Screenshot](ss/ss_1785120026.webp)
+![Screenshot](ss/ss_1785120087.webp)
+![Screenshot](ss/ss_1785120302.webp)
+
+</details>
+
 ---
 
 ## Features
@@ -46,7 +57,7 @@ pnpm install
 
 Copy the downloaded `ga4dataapi-*.json` into the project root, next to `app.js`. The dashboard resolves it automatically by filename pattern — no path to configure.
 
-Prefer to keep the key elsewhere? Set `GA4_CREDENTIALS_PATH` in a root `.env` file to point at it instead:
+Prefer to keep the key elsewhere? Copy `.env.example` to `.env` and set `GA4_CREDENTIALS_PATH` to point at it instead:
 
 ```env
 GA4_CREDENTIALS_PATH=/absolute/path/to/your-key.json
@@ -76,14 +87,11 @@ Once running:
 
 ```bash
 cd mcp-server
-npm install
+pnpm install
 cp .env.example .env
 ```
 
-It does **not** read a JSON key file directly — set one of these in `mcp-server/.env`:
-
-- `GOOGLE_APPLICATION_CREDENTIALS` — path to a key file (can reuse the same `ga4dataapi-*.json` from step 2 above)
-- `GA_SERVICE_ACCOUNT_JSON` — the key's contents inline
+Set `GOOGLE_APPLICATION_CREDENTIALS` in `mcp-server/.env` to a key file path (can reuse the same `ga4dataapi-*.json` from step 2 above).
 
 Then point your MCP client at it, e.g. Claude Desktop's `claude_desktop_config.json`:
 

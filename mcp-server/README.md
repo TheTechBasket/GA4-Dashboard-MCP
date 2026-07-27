@@ -8,20 +8,15 @@ touches the root Pulseboard app's dependencies or runtime.
 
 ```bash
 cd mcp-server
-npm install
+pnpm install
 ```
 
-Provide credentials via env vars — no service-account `.json` file is read
-directly. Pick one:
+Credentials: `GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json` — points at a
+service-account key file on disk, can live anywhere, e.g. the existing
+`ga4dataapi-*.json` in the repo root.
 
-1. `GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json` (points at a file, but
-   the path itself is the only thing in config — the file can live anywhere,
-   e.g. the existing `ga4dataapi-*.json` in the repo root)
-2. `GA_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'` (whole key inline)
-3. `GA_CLIENT_EMAIL` + `GA_PRIVATE_KEY` (just the two fields that matter)
-
-Either put these in `mcp-server/.env` (gitignored, copy from `.env.example`),
-or set them as `env` values when you register the server with Claude
+Either put this in `mcp-server/.env` (gitignored, copy from `.env.example`),
+or set it as an `env` value when you register the server with Claude
 (`claude mcp add`, or the MCP settings UI) — both work, env vars set by the
 MCP client take priority over `.env`.
 
@@ -53,11 +48,7 @@ MCP servers mid-session.
 
 `GOOGLE_APPLICATION_CREDENTIALS` only ever holds a **file path** in Claude's
 config (`~/.claude.json` for user scope) — the private key itself stays in
-the one `.json` file on disk and is never duplicated into a second file.
-Don't switch to `GA_SERVICE_ACCOUNT_JSON`/`GA_CLIENT_EMAIL`+`GA_PRIVATE_KEY`
-unless you actually need the key to travel somewhere the file can't (e.g. a
-CI secret store) — those put the raw key into whatever config holds them,
-which is strictly worse for a single local machine.
+the one `.json` file on disk and is never duplicated into config or `.env`.
 
 ## Tools
 
