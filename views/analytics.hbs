@@ -1926,12 +1926,11 @@
                     if (c.type === 'browsers') { document.getElementById('sumNewUsers').textContent = fmt(data.totals[1] ?? data.totals[0]); document.getElementById('sumNewUsersSub').textContent = rl; showSum(); }
                     if (c.type === 'page-paths') { document.getElementById('sumPageviews').textContent = fmt(data.totals[0]); document.getElementById('sumPageviewsSub').textContent = rl; showSum(); }
                     if (c.type === 'events') { document.getElementById('sumEvents').textContent = fmt(data.totals[0]); document.getElementById('sumEventsSub').textContent = rl; showSum(); }
-                    if (c.type === 'revenue-by-date') {
-                        const totalRevenue = data.totals[0] || 0;
-                        const totalAdRevenue = data.totals[1] || 0;
+                    if (c.type === 'new-users-by-date') {
+                        const revenueIdx = (data.metricHeaders || []).indexOf('totalRevenue');
+                        const totalRevenue = revenueIdx >= 0 ? (data.totals[revenueIdx] || 0) : 0;
                         document.getElementById('sumRevenue').textContent = fmt(totalRevenue, true, data.currencyCode);
-                        document.getElementById('sumRevenueSub').textContent =
-                            totalAdRevenue > 0 ? rl + ' · Ad ' + fmt(totalAdRevenue, true, data.currencyCode) : rl;
+                        document.getElementById('sumRevenueSub').textContent = rl;
                         showSum();
                     }
                 })
@@ -2052,12 +2051,13 @@
         // Update tabs
         document.querySelectorAll('.an-section-tab').forEach(t => t.classList.toggle('active', t.dataset.section === section));
 
-        // Animate section transition
+        // Hide every section except the one being switched to — sections never
+        // carried an 'active' class, so checking for it here left every
+        // previously-shown section visible forever (they stacked instead of
+        // swapping, worse the more tabs you clicked through).
         document.querySelectorAll('.an-section').forEach(s => {
-            if (s.classList.contains('active') || s.classList.contains('entering')) {
-                s.style.display = 'none';
-            }
-            s.classList.remove('active', 'entering', 'exiting');
+            s.classList.remove('entering', 'exiting');
+            s.style.display = (s.id === 'section-' + section) ? '' : 'none';
         });
 
         // Show selected section with entrance animation
