@@ -503,6 +503,21 @@ function openCardModal(pid) {
   loadCardDetail(pid);
 }
 
+document.querySelectorAll('.prop-actions-toggle').forEach(toggle => {
+  toggle.addEventListener('click', event => {
+    event.stopPropagation();
+    const menu = document.getElementById(toggle.getAttribute('aria-controls'));
+    if (!menu) return;
+    const isOpen = !menu.hidden;
+    menu.hidden = isOpen;
+    toggle.setAttribute('aria-expanded', String(!isOpen));
+  });
+});
+
+document.querySelectorAll('[data-card-action]').forEach(link => {
+  link.addEventListener('click', event => event.stopPropagation());
+});
+
 document.querySelectorAll('.prop-card[data-pid]').forEach(card => {
   card.addEventListener('click', function() {
     openCardModal(this.dataset.pid);
@@ -675,37 +690,12 @@ async function fetchTrafficSpikes() {
   try {
     const res = await fetch('/api/spikes');
     const json = await res.json();
-    const container = document.getElementById('spikeInsightsContainer');
-    const cardList = document.getElementById('spikeCardList');
-    const badge = document.getElementById('spikeCountBadge');
 
     document.querySelectorAll('.prop-alert').forEach(el => el.remove());
 
-    if (!json.ok || !json.spikes || json.spikes.length === 0 || !container || !cardList) {
-      if (container) container.style.display = 'none';
+    if (!json.ok || !json.spikes || json.spikes.length === 0) {
       return;
     }
-
-    container.style.display = 'block';
-    if (badge) badge.textContent = `${json.spikes.length} active`;
-
-    cardList.innerHTML = json.spikes.slice(0, 4).map(s => `
-      <button type="button" class="spike-note" data-spike-pid="${escHtmlMain(s.propertyId)}">
-        <span class="spike-note-title">${Number(s.activeUsers || 0).toLocaleString()} active · ${escHtmlMain(s.spikeMultiplier)}x normal</span>
-        <span class="spike-note-copy" data-privacy>${escHtmlMain(s.siteName)}${s.domain ? ` · ${escHtmlMain(s.domain)}` : ''}</span>
-        <span class="spike-note-copy" data-privacy>${escHtmlMain(s.reasonSummary)}</span>
-      </button>
-    `).join('');
-
-    cardList.querySelectorAll('[data-spike-pid]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const card = document.querySelector(`.prop-card[data-pid="${btn.dataset.spikePid}"]`);
-        if (card) {
-          card.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'center' });
-          card.click();
-        }
-      });
-    });
 
     json.spikes.forEach(s => {
       const card = document.querySelector(`.prop-card[data-pid="${s.propertyId}"]`);

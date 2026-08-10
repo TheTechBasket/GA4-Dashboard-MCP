@@ -341,6 +341,9 @@
   body.privacy-blur .prop-sub,
   body.privacy-blur .prop-favicon-wrap,
   body.privacy-blur .prop-link-btn,
+  body.privacy-blur .prop-actions-toggle,
+  body.privacy-blur .prop-actions-menu,
+  body.privacy-blur .prop-action-link,
   body.privacy-blur .cd-page,
   body.privacy-blur [data-privacy],
   body.privacy-blur [data-domain] {
@@ -473,6 +476,57 @@
     gap: 8px;
     flex-shrink: 0;
     padding-top: 2px;
+    position: relative;
+  }
+
+  .prop-actions-toggle {
+    border: 1px solid var(--card-bdr);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+    color: var(--muted);
+    font: 600 10px var(--sans);
+    padding: 5px 7px;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+
+  .prop-actions-toggle:hover,
+  .prop-actions-toggle[aria-expanded="true"],
+  .prop-actions-toggle:focus-visible {
+    background: var(--ice);
+    color: var(--accent);
+    border-color: var(--signal);
+    outline: none;
+  }
+
+  .prop-actions-menu {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 142px;
+    padding: 4px;
+    border: 1px solid var(--card-bdr);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+    box-shadow: 0 8px 18px rgba(15, 18, 25, .14);
+  }
+
+  .prop-action-link {
+    display: block;
+    padding: 7px 8px;
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 11px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .prop-action-link:hover,
+  .prop-action-link:focus-visible {
+    background: var(--ice);
+    color: var(--accent);
+    outline: none;
   }
 
   .prop-link-btn {
@@ -784,35 +838,6 @@
     max-width: 140px;
   }
 
-  .spike-rail {
-    background: var(--card-bg);
-    border: 1px solid var(--card-bdr);
-    border-radius: var(--radius);
-    padding: 12px;
-    margin-bottom: 16px;
-    box-shadow: rgba(111, 123, 144, 0.1) 0 -2px 0 0 inset;
-  }
-
-  .spike-rail-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 10px;
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .spike-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 8px;
-  }
-
-  .spike-note,
   .prop-alert {
     border: 1px solid #bedbff;
     border-radius: var(--radius);
@@ -821,14 +846,6 @@
     box-shadow: rgba(111, 123, 144, 0.05) 0 -2px 0 0 inset;
   }
 
-  .spike-note {
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .spike-note-title,
   .prop-alert-title {
     font-family: var(--mono);
     font-size: 10px;
@@ -836,7 +853,6 @@
     color: var(--accent);
   }
 
-  .spike-note-copy,
   .prop-alert-copy {
     font-size: 11px;
     line-height: 1.4;
@@ -1204,15 +1220,6 @@
       </div>
       </div>
 
-{{!-- Compact traffic spike notifications --}}
-<div id="spikeInsightsContainer" class="spike-rail" style="display:none">
-  <div class="spike-rail-head">
-    <span>Traffic alerts</span>
-    <span id="spikeCountBadge">0</span>
-  </div>
-  <div id="spikeCardList" class="spike-list"></div>
-</div>
-
       {{!-- Sort toolbar --}}
       <div class="sort-bar">
         <span class="sort-label">Sort</span>
@@ -1253,16 +1260,21 @@
             <div class="live-dot" title="{{this.activeUsers}} active user(s)"></div>
             {{/if}}
 
-            {{#unless this.error}}
-            <a class="prop-link-btn" href="{{this.dashboardUrl}}" target="_blank" rel="noopener noreferrer"
-              onclick="event.stopPropagation()" title="Open property dashboard">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-            </a>
-            {{/unless}}
+            <button type="button" class="prop-actions-toggle" aria-expanded="false"
+              aria-controls="prop-actions-{{this.propertyId}}" title="Property actions">
+              Actions
+            </button>
+            <div class="prop-actions-menu" id="prop-actions-{{this.propertyId}}" hidden>
+              <a href="{{this.analyticsUrl}}" class="prop-action-link" data-card-action>
+                Open analytics
+              </a>
+              {{#if this.websiteUrl}}
+              <a href="{{this.websiteUrl}}" class="prop-action-link" target="_blank"
+                rel="noopener noreferrer" data-card-action>
+                Visit website
+              </a>
+              {{/if}}
+            </div>
           </div>
         </div>
 

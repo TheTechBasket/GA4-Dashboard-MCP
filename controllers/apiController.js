@@ -9,6 +9,7 @@ const {
 const { runSafeHistoricalReport, runSafeRealtimeReport, CREDENTIALS_PATH } = require("./ga4Service");
 const { stripSensitiveGlobeUsersPayload } = require("./privacy");
 const { cacheGet, cacheSet, cacheCleanup } = require("./reportCache");
+const { analyticsUrl, websiteUrl } = require("./propertyActions");
 
 const CACHE_DIR = path.join(__dirname, "..", ".cache");
 const PROPERTIES_CACHE_PATH = path.join(CACHE_DIR, "properties.json");
@@ -398,6 +399,8 @@ exports.allrealtime = async (req, res) => {
             pageViews: r.pageViews,
             error: r.error ? r.errorMessage : null,
             dashboardUrl: r.dashboardUrl,
+            analyticsUrl: analyticsUrl(r.propertyId),
+            websiteUrl: websiteUrl(r.url),
         }));
 
         res.status(200).render("home", {
