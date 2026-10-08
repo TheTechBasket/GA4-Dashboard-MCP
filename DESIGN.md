@@ -1,439 +1,248 @@
-# Zed — Style Reference
-> Blueprint workshop, wide open. A near-white gridded page held together by a single deep violet-blue and the calm authority of a humanist serif — every screen feels like a chapter in a well-printed technical manual.
+---
+name: GA4 Dashboard & MCP
+description: A self-hosted GA4 command center; a quiet instrument panel, not a themed world.
+colors:
+  bg: "light-dark(#f3f3f6, #0b0b0e)"
+  surface: "light-dark(#ffffff, #131317)"
+  surface-2: "light-dark(#f7f7f9, #1a1a1f)"
+  surface-3: "light-dark(#ebebf0, #23232a)"
+  border: "light-dark(#ececf1, #1f1f25)"
+  border-2: "light-dark(#dcdce3, #2f2f37)"
+  text: "light-dark(#18181b, #f4f4f5)"
+  text-2: "light-dark(#52525b, #a1a1aa)"
+  text-3: "light-dark(#6b6b76, #8e8e99)"
+  accent: "#4f46e5"
+  accent-2: "light-dark(#4338ca, #4f46e5)"
+  accent-fg: "light-dark(#4338ca, #a5b4fc)"
+  accent-soft: "light-dark(#eef2ff, rgba(129,140,248,.14))"
+  good: "light-dark(#15803d, #4ade80)"
+  warn: "light-dark(#b45309, #fbbf24)"
+  bad: "light-dark(#b91c1c, #f87171)"
+  chart-1: "light-dark(#4f46e5, #818cf8)"
+  chart-2: "light-dark(#0891b2, #22d3ee)"
+  chart-3: "light-dark(#d97706, #fbbf24)"
+  chart-4: "light-dark(#7c3aed, #c4b5fd)"
+typography:
+  display:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "1.5rem"
+    fontWeight: 600
+    lineHeight: 1.25
+    letterSpacing: "-.011em"
+  title:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "1rem"
+    fontWeight: 600
+    lineHeight: 1.25
+    letterSpacing: "-.011em"
+  body:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: ".875rem"
+    fontWeight: 400
+    lineHeight: 1.5
+  label:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: ".8125rem"
+    fontWeight: 500
+  mono:
+    fontFamily: "ui-monospace, SF Mono, Cascadia Mono, Menlo, Consolas, monospace"
+    fontSize: ".92em"
+rounded:
+  sm: "2px"
+  base: "2px"
+  lg: "3px"
+  pill: "2px"
+spacing:
+  s1: "4px"
+  s2: "8px"
+  s3: "12px"
+  s4: "16px"
+  s5: "20px"
+  s6: "24px"
+  s8: "32px"
+  s10: "40px"
+  s12: "48px"
+components:
+  button-primary:
+    backgroundColor: "{colors.accent}"
+    textColor: "#ffffff"
+    rounded: "{rounded.base}"
+    padding: "0 12px"
+    height: "32px"
+  button-primary-hover:
+    backgroundColor: "{colors.accent-2}"
+  button-secondary:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.base}"
+    padding: "0 12px"
+    height: "32px"
+  button-ghost:
+    backgroundColor: "transparent"
+    textColor: "{colors.text-2}"
+    rounded: "{rounded.base}"
+  card:
+    backgroundColor: "{colors.surface}"
+    rounded: "{rounded.lg}"
+  chip:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.pill}"
+    height: "26px"
+  badge-good:
+    backgroundColor: "{colors.good-soft}"
+    textColor: "{colors.good}"
+    rounded: "{rounded.pill}"
+    height: "20px"
+  input:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.base}"
+    height: "32px"
+    padding: "0 10px"
+---
 
-**Theme:** light
+# Design System: GA4 Dashboard & MCP
 
-Zed reads as an open-source engineering notebook rendered on faint blueprint paper: a near-white grid canvas, a single deep violet-blue that carries every heading and link, and product chrome that stays almost entirely text and hairline borders. Typography is the personality — a humanist serif (Plex Serif) for headlines at surprisingly light weights (340), a custom Writer sans for UI and body, and a wide-tracked mono (Zed Mono) for labels and shortcuts. Components are sharp-cornered (2px radius), compact (6px gaps), and almost shadowless; structure is implied by 1px inset top-borders and the faint dotted grid beneath everything. The download CTA is the only saturated fill on the page, and surrounding it everything stays quiet, typographic, and editorial — closer to a technical whitepaper than a SaaS landing page.
+## Overview
 
-## Tokens — Colors
+**Creative North Star: "The Instrument Panel"**
 
-| Name | Value | Token | Role |
-|------|-------|-------|------|
-| Hero Violet | `#1348dc` | `--color-hero-violet` | Headlines, primary text links, brand mark — the single chromatic anchor that carries identity across the page |
-| Signal Blue | `#2b7fff` | `--color-signal-blue` | Blue supporting accent for decorative details and low-frequency emphasis. Do not promote it to the primary CTA color |
-| Sky Tint | `#8ec5ff` | `--color-sky-tint` | Blue supporting accent for decorative details and low-frequency emphasis. Do not promote it to the primary CTA color |
-| Frost | `#bedbff` | `--color-frost` | Hairline blue borders, tag outlines, divider lines that need to read as on-brand rather than neutral |
-| Slate Blue | `#74ade8` | `--color-slate-blue` | Icon strokes, secondary blue text, nav active markers — cool blue for chrome, not headlines |
-| Ice Wash | `#e6effe` | `--color-ice-wash` | Subtle background tints behind selected nav, soft blue drop-shadow tint, hover wash |
-| Deep Cobalt | `#053794` | `--color-deep-cobalt` | Pressed-state inset shadow and the deepest brand blue — appears only as a 2px inset top line on active nav items |
-| Silver Mist | `#e5e7eb` | `--color-silver-mist` | Page canvas, dominant border color, the faint grid lines — the workhorse neutral that holds the system together |
-| Pure White | `#ffffff` | `--color-pure-white` | Card surfaces, editor preview frames, raised content panels sitting on the Silver Mist canvas |
-| Off-White | `#f4f4f2` | `--color-off-white` | Warm white surface variant, image backings, slightly creamier than Pure White |
-| Graphite | `#3a3d43` | `--color-graphite` | Primary body and heading text, logo lockup color |
-| Charcoal | `#464b57` | `--color-charcoal` | Strong body text, button text on light fills, dark UI labels |
-| Slate | `#5d636f` | `--color-slate` | Secondary text, nav labels, supporting copy |
-| Pewter | `#6a7282` | `--color-pewter` | Tertiary text, muted helper copy, disabled labels |
-| Ash | `#878a98` | `--color-ash` | Muted icons, placeholder strokes, very low-emphasis UI |
-| Steel | `#b2b5bb` | `--color-steel` | Muted text, icon outlines, very low-contrast labels |
-| Fog | `#cccfd3` | `--color-fog` | Light borders, input borders at rest, disabled surfaces |
-| Mist | `#dadde2` | `--color-mist` | Hairline dividers between rows, subtle background fills |
-| Onyx | `#282c33` | `--color-onyx` | Dark editor preview surface, code block backgrounds |
-| Midnight | `#2f343e` | `--color-midnight` | Dark surface variant for framed code/editor insets |
+This is a cockpit, not a magazine. It reads like the tools it sits beside: Linear, the Vercel dashboard, Plausible, Stripe's dashboard. The owner explicitly ruled out themed or quirky visual worlds on 2026-09-21 (a prior "Zed" engineering-notebook theme was rejected and never shipped) and asked for something familiar and polished that most self-hosters would like at first glance without thinking about it. Nothing here is decorative; every mark either carries a number, a state, or a way to act on data.
 
-## Tokens — Typography
+Density is high but calm: sharp geometry, a tight neutral scale, one indigo accent held in reserve, and a monochrome-first surface hierarchy where color is spent only on signal (good/warn/bad, the accent, chart series). Cards are borderless and separate from the page only by a soft background step, so the eye reads structure without being told where the lines are. Motion is a confirmation, not a performance: transform and opacity only, 120-200ms, off entirely under `prefers-reduced-motion`.
 
-### Writer — Primary UI and body face — the calm, slightly condensed sans that carries every label, button, nav item, and paragraph. Its negative tracking (-0.4px at 16px) tightens the page into a dense, confident reading rhythm. At 9–11px it functions as micro-copy and tag text; at 14–16px it carries body paragraphs. Substitute: Inter, IBM Plex Sans, or Geist Sans at matching weights. · `--font-writer`
-- **Substitute:** Inter or IBM Plex Sans
-- **Weights:** 400
-- **Sizes:** 9px, 10px, 11px, 12px, 13px, 14px, 16px
-- **Line height:** 1.10, 1.33, 1.43, 1.50, 1.71
-- **Letter spacing:** -0.0250em
-- **Role:** Primary UI and body face — the calm, slightly condensed sans that carries every label, button, nav item, and paragraph. Its negative tracking (-0.4px at 16px) tightens the page into a dense, confident reading rhythm. At 9–11px it functions as micro-copy and tag text; at 14–16px it carries body paragraphs. Substitute: Inter, IBM Plex Sans, or Geist Sans at matching weights.
+**Key Characteristics:**
+- One accent (indigo `#4f46e5`), used sparingly: primary actions, active nav state, focus rings, the primary chart series.
+- Sharp, near-flat geometry: 2-3px radii everywhere, no soft/rounded forms.
+- Cards carry no border; elevation is a background-color step, never a shadow, at rest.
+- Full light/dark parity via `light-dark()`, OS preference by default, explicit override via `data-theme`.
+- Self-hosted Inter Variable with tabular numerals on every numeric readout.
 
-### Plex Serif — Headlines and display text. The signature choice is weight 340 for large display ('Love your editor again' at 48px) — an unusually light cut that whispers rather than shouts, paired with tight -0.02em tracking (-0.96px at 48px). This is what makes the page read editorial rather than promotional. Used at 26px for section headlines, 17px for sub-headings, and occasionally for body emphasis. Substitute: IBM Plex Serif or Source Serif Pro. · `--font-plex-serif`
-- **Substitute:** IBM Plex Serif or Source Serif Pro
-- **Weights:** 340, 400
-- **Sizes:** 13px, 14px, 15px, 17px, 26px, 48px
-- **Line height:** 1.10, 1.20, 1.25, 1.43, 1.50
-- **Letter spacing:** -0.0200em
-- **Role:** Headlines and display text. The signature choice is weight 340 for large display ('Love your editor again' at 48px) — an unusually light cut that whispers rather than shouts, paired with tight -0.02em tracking (-0.96px at 48px). This is what makes the page read editorial rather than promotional. Used at 26px for section headlines, 17px for sub-headings, and occasionally for body emphasis. Substitute: IBM Plex Serif or Source Serif Pro.
+## Colors
 
-### Zed Mono — Monospaced face for keyboard shortcuts, command labels, keycaps, and editor chrome labels. Its +0.05em tracking (0.6px at 12px, 1.2px at 24px) deliberately widens letterforms to read as labels rather than code — a stylistic choice that signals 'this is a keybind, not syntax'. At 24px it functions as a large command-prompt display. Substitute: JetBrains Mono or IBM Plex Mono. · `--font-zed-mono`
-- **Substitute:** JetBrains Mono or IBM Plex Mono
-- **Weights:** 400
-- **Sizes:** 10px, 11px, 12px, 24px
-- **Line height:** 1.33, 1.50, 1.67, 2.00
-- **Letter spacing:** 0.0500em
-- **Role:** Monospaced face for keyboard shortcuts, command labels, keycaps, and editor chrome labels. Its +0.05em tracking (0.6px at 12px, 1.2px at 24px) deliberately widens letterforms to read as labels rather than code — a stylistic choice that signals 'this is a keybind, not syntax'. At 24px it functions as a large command-prompt display. Substitute: JetBrains Mono or IBM Plex Mono.
+Palette strategy is a tight neutral scale (six steps of surface/border/text per theme) plus one reserved accent and three semantic signal colors, all defined once as `light-dark()` pairs so light and dark are the same system, not two skins.
 
-### ui-monospace — System mono fallback for nav and small chrome where a custom face isn't loaded. Negative tracking (-0.38px at 12px) tightens it for label use rather than code reading. · `--font-ui-monospace`
-- **Weights:** 400, 700
-- **Sizes:** 11px, 12px
-- **Line height:** 1.00, 1.33, 1.43
-- **Letter spacing:** -0.0320em
-- **Role:** System mono fallback for nav and small chrome where a custom face isn't loaded. Negative tracking (-0.38px at 12px) tightens it for label use rather than code reading.
+### Primary
+- **Indigo Accent** (`#4f46e5`, hover `light-dark(#4338ca, #4f46e5)`, on-surface `light-dark(#4338ca, #a5b4fc)`, soft fill `light-dark(#eef2ff, rgba(129,140,248,.14))`): primary buttons, the active nav item, focus rings, and the default chart series. It is the one color allowed to command attention.
 
-### Type Scale
+### Neutral
+- **Page** (`light-dark(#f3f3f6, #0b0b0e)`): the body background, one step darker/deeper than any card.
+- **Surface** (`light-dark(#ffffff, #131317)`): cards, inputs, the sidebar rail, popovers.
+- **Surface Raised** (`light-dark(#f7f7f9, #1a1a1f)`): hover state for surface-level rows and buttons.
+- **Surface Sunken** (`light-dark(#ebebf0, #23232a)`): segmented-control track, skeleton loaders, badge backgrounds.
+- **Border** (`light-dark(#ececf1, #1f1f25)`): hairlines only (table rows, rail edge).
+- **Border Strong** (`light-dark(#dcdce3, #2f2f37)`): input and button strokes, floating-panel edges.
+- **Text Primary** (`light-dark(#18181b, #f4f4f5)`), **Text Muted** (`light-dark(#52525b, #a1a1aa)`), **Text Faint** (`light-dark(#6b6b76, #8e8e99)`): three-step text hierarchy for label/body/caption.
 
-| Role | Size | Line Height | Letter Spacing | Token |
-|------|------|-------------|----------------|-------|
-| caption | 12px | 1.5 | -0.3px | `--text-caption` |
-| body | 14px | 1.5 | -0.35px | `--text-body` |
-| heading-sm | 26px | 1.25 | -0.52px | `--text-heading-sm` |
-| heading | 48px | 1.1 | -0.96px | `--text-heading` |
+### Semantic
+- **Good** (`light-dark(#15803d, #4ade80)`), **Warn** (`light-dark(#b45309, #fbbf24)`), **Bad** (`light-dark(#b91c1c, #f87171)`), each with a `-soft` tint background for badge/pill fills. Used for freshness pills, quota state, spike badges, and delta indicators.
 
-## Tokens — Spacing & Shapes
+### Chart Series
+- **Chart 1-4** (`#4f46e5`/`#818cf8`, `#0891b2`/`#22d3ee`, `#d97706`/`#fbbf24`, `#7c3aed`/`#c4b5fd`): distinguishable in both themes and by lightness alone for color-blind readers. Series 1 is always the accent; use 2-4 in order for additional series, never reassign per-chart.
 
-**Density:** compact
+### Named Rules
+**The One Accent Rule.** Indigo is the only color that carries decorative or brand weight. Everywhere else, color is semantic (good/warn/bad) or structural (the neutral scale). If a new element wants a color and it isn't a primary action, active state, or a data signal, it gets a neutral, not the accent.
 
-### Spacing Scale
+## Typography
 
-| Name | Value | Token |
-|------|-------|-------|
-| 4 | 4px | `--spacing-4` |
-| 6 | 6px | `--spacing-6` |
-| 8 | 8px | `--spacing-8` |
-| 10 | 10px | `--spacing-10` |
-| 12 | 12px | `--spacing-12` |
-| 14 | 14px | `--spacing-14` |
-| 16 | 16px | `--spacing-16` |
-| 20 | 20px | `--spacing-20` |
-| 24 | 24px | `--spacing-24` |
-| 32 | 32px | `--spacing-32` |
-| 36 | 36px | `--spacing-36` |
-| 40 | 40px | `--spacing-40` |
-| 48 | 48px | `--spacing-48` |
-| 224 | 224px | `--spacing-224` |
+**Body/Display Font:** Inter Variable (self-hosted, `design/assets/fonts/InterVariable.woff2`, variable weight 100-900), fallback `system-ui, sans-serif`.
+**Mono/Label Font:** `ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace`, used for `.mono` (technical strings) and `.kbd` (keyboard hints).
 
-### Border Radius
+**Character:** One typeface for everything. There is no separate display face; hierarchy comes from weight, size, and letter-spacing tightening at larger sizes, not from font-switching. All numeric readouts use tabular figures (`.num`) so columns of numbers align.
 
-| Element | Value |
-|---------|-------|
-| tags | 2px |
-| cards | 2px |
-| inputs | 2px |
-| buttons | 2px |
-| logoTiles | 2px |
-| editorFrame | 6px |
+### Hierarchy
+- **Headline** (600, `1.5rem`/24px, line-height 1.25, `-.011em` tracking): `h1`, page titles.
+- **Title** (600, `1rem`/16px, line-height 1.25, `-.011em` tracking): `h2`, card headers.
+- **Subtitle** (600, `.875rem`/14px, line-height 1.25): `h3`, sub-section headers.
+- **Body** (400, `.875rem`/14px, line-height 1.5): default running text and table cells.
+- **Small** (400/500, `.8125rem`/13px): secondary labels, tab labels, segmented control text.
+- **Caption** (400/500, `.75rem`/12px): table headers, badges, timestamps, nav labels on the phone tab bar.
+- **Hero Number** (600, 52px, `-.02em` tracking): the single live-active-users readout on Home; the one place type is allowed to be large.
 
-### Shadows
-
-| Name | Value | Token |
-|------|-------|-------|
-| subtle | `rgba(111, 123, 144, 0.1) 0px -2px 0px 0px inset` | `--shadow-subtle` |
-| subtle-2 | `rgba(111, 123, 144, 0.05) 0px -2px 0px 0px inset` | `--shadow-subtle-2` |
-| subtle-3 | `rgb(5, 55, 148) 0px -2px 0px 0px inset, rgb(230, 239, 254...` | `--shadow-subtle-3` |
-| subtle-4 | `rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0p...` | `--shadow-subtle-4` |
-| md | `rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1)...` | `--shadow-md` |
-
-### Layout
-
-- **Page max-width:** 1200px
-- **Section gap:** 64-80px
-- **Card padding:** 24px
-- **Element gap:** 6px
-
-## Components
-
-### Top Navigation Bar
-**Role:** Primary site navigation, minimal header
-
-White background, 1px #e5e7eb bottom border, ~60px height. Left: Zed wordmark in Writer at 16px weight 400 #3a3d43. Center: nav links (Product, Resources, Extensions, Docs, Pricing) in Writer 14px #5d636f, 24px horizontal gap. Right: search icon, language switcher, 'Sign up' ghost link, and 'Download' filled blue button (#2b7fff, white text, 2px radius, 8px 14px padding). Active nav item gets a 2px inset Deep Cobalt top-border and Ice Wash background.
-
-### Primary Action Button (Download)
-**Role:** Highest-priority conversion CTA
-
-Filled #2b7fff background, white text in Writer 14px weight 400, 2px radius, 10px 16px padding, 6px gap between label and trailing icon. The vivid blue is the only saturated fill on the entire page; everything else recedes behind it. Sits with a subtle rgba(0,0,0,0.1) 0 1px 3px drop shadow. Trailing download arrow icon in white.
-
-### Ghost / Outline Button (Clone source)
-**Role:** Secondary action alongside the primary CTA
-
-Transparent background, 1px #cccfd3 border, Writer 14px #3a3d43 text, 2px radius, 10px 16px padding, 6px gap to leading GitHub icon. Reads as the quieter sibling of the blue Download button.
-
-### Hero Section
-**Role:** First-screen identity statement
-
-Full-width Silver Mist (#e5e7eb) canvas with a faint dotted grid overlay (8px dot spacing). Centered stack: Plex Serif 48px weight 340 #1348dc headline ('Love your editor again') with -0.96px tracking, Writer 16px #5d636f subtext below, then a horizontal row of Primary Action + Ghost Button with 8px gap, then Writer 13px #6a7280 platform line ('Available for macOS, Linux, and Windows'). Vertical rhythm uses 16–24px gaps between elements. No card, no background panel — the grid paper IS the hero.
-
-### Three-Column Feature Block
-**Role:** Value proposition summary (Fast, Intelligent, Collaborative)
-
-Three equal-width columns on the Silver Mist canvas, 32px column gap. Each column: Plex Serif 17px weight 400 #1348dc label as a section title, Writer 14px #5d636f description paragraph below at 1.5 line-height. No cards, no borders, no icons — pure typographic separation. ~80px vertical padding above and below.
-
-### Editor Preview Card
-**Role:** Product showcase — the editor itself in context
-
-The hero's main visual artifact. Dark surface #282c33 filling the full card, 6px corner radius, soft 10px 15px -3px black/0.1 drop shadow that lifts it off the canvas. Inside: a faux macOS title bar (traffic lights), tab strip with file names in Zed Mono 12px, a file tree on the left (Gruvbox-tinted backgrounds in the mockup), and the main code pane with syntax highlighting using the full editor color palette (green #a1c181 for strings, red #d07277 for keywords, yellow #dec184 for types, teal #6eb4bf for functions, violet #b477cf for variables, orange #bf956a for constants). The card sits centered at ~1200px wide.
-
-### Logo Wall
-**Role:** Social proof — trusted-by strip
-
-Centered Plex Serif 26px weight 340 #1348dc heading ('Trusted by world-class developers & industry leading teams'), then a single horizontal row of grayscale company logos (Atlassian, Apple, Anthropic, Vercel, AWS, Baseten) at uniform ~80px height, evenly spaced. Logos are dark gray #3a3d43 to #5d636f, no color. ~48px vertical padding around the row.
-
-### Testimonial Card
-**Role:** Quoted endorsement from a named developer
-
-White (#ffffff) surface on the Silver Mist canvas, 2px radius, 1px #e5e7eb border, 24px padding. Quote text in Plex Serif 15px weight 400 #3a3d43 at 1.5 line-height, set in italic-feeling rhythm. Bottom row: small avatar (32px circle, 2px radius), name in Writer 13px weight 400 #3a3d43, role/company in Writer 12px #6a7282. Featured testimonial (Anthropic) uses a slightly larger card with the same structure.
-
-### Open Source Stats Block
-**Role:** Community credibility numbers
-
-Centered Plex Serif 26px #1348dc heading ('Open Source'), Writer 16px #5d636f subtext, then a four-column row of stats. Each stat: Plex Serif 26px weight 340 #1348dc number on top (7,784 / 78,821 / 1,766 / 1,020), Writer 13px #6a7282 label below. Numbers use the same display-weight serif as headlines to keep the typographic language consistent. Above and below the numbers, rows of tiny contributor avatar circles (24px, 2px radius) form a visual fence.
-
-### Two-Column Feature Section (AI / Agentic Editing)
-**Role:** Explanatory section pairing text with a product visual
-
-Full-width Silver Mist band, 1200px centered content. Left column (~40%): Plex Serif 26px #1348dc section heading, Writer 16px #5d636f description, Writer 14px #1348dc 'Learn More →' link. Right column (~60%): a dark editor screenshot card (#282c33, 6px radius) showing a split-pane code review interface. Section gap ~80px above and below, creating a distinct band in the page rhythm.
-
-### Keybind / Shortcut Label
-**Role:** Monospaced keyboard hint used in editor chrome and feature callouts
-
-Zed Mono 12px #3a3d43 text, +0.6px letter-spacing (0.05em), inside a 1px #cccfd3 bordered chip, 2px radius, 4px 8px padding. Sometimes sits on a #f4f4f2 background to read as a keycap. The wide tracking is what distinguishes it from inline code — it reads as a label, not as syntax.
-
-### Footer
-**Role:** Site footer with secondary links and brand mark
-
-Silver Mist canvas continuing from the page, 1px #e5e7eb top border, 48px vertical padding. Writer 13px #6a7282 link list in 3–4 columns, Zed wordmark in Writer 14px #3a3d43 at the bottom-left. No background fill change — the footer is implied by a single horizontal rule, not a panel.
-
-## Do's and Don'ts
-
-### Do
-- Set headlines in Plex Serif weight 340 at 48px with -0.96px tracking — the whisper-weight serif is the signature.
-- Use Signal Blue (#2b7fff) fill for the primary Download action; it must be the only saturated fill on the screen.
-- Build all cards, buttons, tags, and inputs with a 2px corner radius — sharp corners are part of the editorial feel.
-- Use 6px gaps as the default element spacing and 64–80px as section gaps to keep the page compact and dense.
-- Pair every action button with a ghost/outline variant sitting 8px to the right — never a single-button row.
-- Express structure with 1px #e5e7eb borders and 2px inset top-lines, not with drop shadows.
-- Use Zed Mono 12px with +0.6px tracking (0.05em) for keybind chips and command labels — the wide tracking distinguishes them from inline code.
-
-### Don't
-- Don't use Plex Serif above weight 400 for headlines — the lightness at 340 is the whole point.
-- Don't introduce a second saturated color for buttons, tags, or accents — Hero Violet and Signal Blue are the only chromatic UI colors.
-- Don't apply drop shadows to cards, nav, or text blocks — the only shadow that belongs is under the editor preview card.
-- Don't round corners beyond 6px; 32px or 40px radii on any control breaks the editorial system.
-- Don't use blue or violet for body text — those hues are reserved for headlines, links, and the CTA. Body text is Graphite or Slate.
-- Don't set body text larger than 16px or smaller than 13px in Writer — outside that range the page loses its typographic discipline.
-- Don't add decorative gradients, glassmorphism, or background images to sections — the dotted-grid canvas is the only texture allowed.
-
-## Surfaces
-
-| Level | Name | Value | Purpose |
-|-------|------|-------|---------|
-| 0 | Canvas | `#e5e7eb` | Page background with faint dotted grid overlay |
-| 1 | Card | `#ffffff` | White content cards, testimonial panels, feature blocks |
-| 2 | Warm Surface | `#f4f4f2` | Cream-tinted surfaces for image holders and alternating bands |
-| 3 | Blue Wash | `#e6effe` | Selected nav background, soft blue tinted zones |
-| 4 | Dark Frame | `#282c33` | Editor screenshot and dark code insets |
-
-## Elevation
-
-- **Active nav item:** `rgb(5, 55, 148) 0px -2px 0px 0px inset, rgb(230, 239, 254) 0px 1px 3px 0px`
-- **Subtle separator / button top-edge:** `rgba(111, 123, 144, 0.1) 0px -2px 0px 0px inset`
-- **Light divider:** `rgba(111, 123, 144, 0.05) 0px -2px 0px 0px inset`
-- **Raised button:** `rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px`
-- **Editor screenshot card:** `rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px`
-
-## Imagery
-
-Imagery is dominated by one element: the dark editor screenshot. It appears full-bleed within a 1200px frame, presented as a high-fidelity product capture with the macOS chrome, tabs, file tree, and syntax-highlighted code. The code uses a Gruvbox-inspired palette of warm muted hues (green, red, yellow, teal, violet, orange) on a near-black surface — a deliberate visual contrast to the otherwise light page. Beyond the editor, the only other imagery is a row of grayscale company logos for social proof and small circular contributor avatars. No lifestyle photography, no abstract graphics, no illustrations. The grid-patterned page background functions as the primary visual texture.
+### Named Rules
+**The Tabular Numerals Rule.** Every number that appears more than once in a column, delta, or live readout carries `.num` (`font-variant-numeric: tabular-nums`). Numbers must not visually reflow as they update.
 
 ## Layout
 
-The page model is centered, max-width 1200px content within a full-width Silver Mist canvas. The canvas carries a faint dotted grid overlay (8px spacing) that reads as blueprint paper and persists across every section — there are no alternating colored bands, only a continuous textured background. The hero is a centered typographic stack: Plex Serif display headline, Writer subtext, two side-by-side buttons, platform line. Sections below follow a rhythm of centered headlines over content blocks: a 3-column feature row, a wide editor preview card, a centered logo wall, a 3-column testimonial row, a 4-column stats block, and a 2-column text+visual section. The navigation is a thin top bar with center-aligned nav links and right-aligned actions. Vertical rhythm uses 64–80px between major sections and 6–16px within content. The only true full-bleed moment is the Silver Mist canvas itself; content always sits within the 1200px column.
+Content sits in a centered column, `max-width: 1320px`, with `24px` horizontal padding and `96px` bottom padding for scroll comfort. The spacing scale is `4/8/12/16/20/24/32/40/48px` (`--s1` through `--s12`); component internals use the low end (`--s2`/`--s3`), page rhythm uses the high end (`--s4`/`--s5`/`--s6`).
 
-## Agent Prompt Guide
+The shell is a single collapsible sidebar: a 56px icon rail by default, expanding to 216px with labels via `html[data-rail="expanded"]`. Width switches instantly, never animates; only label opacity fades in (`railfade`, 180ms). Below an 860px breakpoint the rail becomes a fixed bottom tab bar with icon+label, safe-area aware. Page content shifts with `padding-left: var(--rail-w)` on desktop and `padding-bottom` on phone; there is no separate top nav bar (`--nav-h: 52px` is reserved for pages that need one).
 
-Quick Color Reference:
-- Text (primary): #3a3d43 (Graphite)
-- Text (secondary): #5d636f (Slate)
-- Background (canvas): #e5e7eb (Silver Mist)
-- Background (card): #ffffff (Pure White)
-- Border (hairline): #e5e7eb (Silver Mist)
-- Accent / Headline: #1348dc (Hero Violet)
-- primary action: no distinct CTA color
+## Elevation & Depth
 
-Example Component Prompts:
-No distinct primary action color was observed; use the extracted neutral button treatments instead of inventing a filled CTA color.
-2. Editor preview card: Dark surface #282c33, 6px corner radius, soft shadow rgba(0,0,0,0.1) 0 10px 15px -3px. Inside: a 28px macOS title bar with red/yellow/green traffic lights, then a tab strip in Zed Mono 12px with +0.6px tracking showing file names. Main pane shows code in Zed Mono 12px with syntax colors — strings #a1c181, keywords #d07277, types #dec184, functions #6eb4bf, variables #b477cf, constants #bf956a — on the #282c33 background.
-3. Three-column feature block: Three equal columns on the Silver Mist canvas with 32px column gap. Each column starts with a Plex Serif 17px weight 400 #1348dc label, followed by Writer 14px weight 400 #5d636f body text at line-height 1.50. No borders, no cards, no icons — pure typographic separation with 80px vertical padding above and below.
-4. Testimonial card: White (#ffffff) surface, 2px radius, 1px #e5e7eb border, 24px padding. Quote in Plex Serif 15px weight 400 #3a3d43, italic-feel rhythm, line-height 1.50. Bottom row: 32px circular avatar, Writer 13px #3a3d43 name, Writer 12px #6a7282 role. Sits on the Silver Mist canvas as the only white object in a 3-column grid.
-5. Keybind chip: Zed Mono 12px weight 400 #3a3d43 text, letter-spacing 0.6px (0.05em), 1px #cccfd3 border, #f4f4f2 background, 2px radius, 4px 8px padding. Used inline next to feature descriptions to signal keyboard shortcuts — the wide tracking is what makes it read as a label rather than code.
+The system is flat by default: elevation is expressed through background-color steps in the neutral scale (page → surface → surface-2 → surface-3), never through shadow. `.card` has no border and no shadow at rest; it reads as a shape purely because it sits one step lighter (light theme) or lighter-relative (dark theme) than the page behind it.
 
-## Similar Brands
+The one shadow token, `--pop-shadow` (`0 8px 24px -6px rgba(0,0,0,.18), 0 2px 6px -2px rgba(0,0,0,.10)`), exists only for content that leaves the document flow: popovers, tooltips, the state-preview control. Nothing that sits in normal document flow gets a shadow.
 
-- **Linear** — Same single-accent-blue-on-near-white approach with sharp corners, typographic density, and a signature product screenshot as the visual centerpiece.
-- **Vercel** — Minimal light landing pages anchored by a serif-or-geometric display headline, a single saturated CTA color, and full-bleed product chrome over a near-white canvas.
-- **Tailscale** — Developer-tool sites that lean on compact typographic systems, hairline borders, and 2px-radius components instead of cards and elevation.
-- **Resend** — Light-canvas dev marketing with one chromatic brand blue used sparingly, a dark code/editor inset as the hero visual, and tight editorial spacing.
+### Shadow Vocabulary
+- **Floating** (`--pop-shadow`): popovers (`.pop.open`), tooltips (`.tip`), any absolutely-positioned overlay layer.
 
-## Quick Start
+### Named Rules
+**The Background-Step Rule.** Depth is a background-color difference, not a shadow or a border. Reach for the next step in the neutral scale (`--surface` → `--surface-2` → `--surface-3`) before reaching for `box-shadow`.
 
-### CSS Custom Properties
+## Shapes
 
-```css
-:root {
-  /* Colors */
-  --color-hero-violet: #1348dc;
-  --color-signal-blue: #2b7fff;
-  --color-sky-tint: #8ec5ff;
-  --color-frost: #bedbff;
-  --color-slate-blue: #74ade8;
-  --color-ice-wash: #e6effe;
-  --color-deep-cobalt: #053794;
-  --color-silver-mist: #e5e7eb;
-  --color-pure-white: #ffffff;
-  --color-off-white: #f4f4f2;
-  --color-graphite: #3a3d43;
-  --color-charcoal: #464b57;
-  --color-slate: #5d636f;
-  --color-pewter: #6a7282;
-  --color-ash: #878a98;
-  --color-steel: #b2b5bb;
-  --color-fog: #cccfd3;
-  --color-mist: #dadde2;
-  --color-onyx: #282c33;
-  --color-midnight: #2f343e;
+Radii are sharp and small across the whole system: `2px` for controls and inputs (`--r`, `--r-sm`), `3px` for cards and floating panels (`--r-lg`), `2px` for pills/chips/badges (`--r-pill`, kept sharp rather than fully rounded so "pill" here means shape-of-role, not literal roundness). Borders are reserved for a specific short list: inputs, buttons, floating layers (popovers, tooltips), and table/list hairlines. Cards, page sections, and the sidebar's inner content never take a border for its own sake; the sidebar's one border (`border-right`) is a hairline separating it from content, consistent with the hairline rule.
 
-  /* Typography — Font Families */
-  --font-writer: 'Writer', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-plex-serif: 'Plex Serif', ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-zed-mono: 'Zed Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --font-ui-monospace: 'ui-monospace', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+### Named Rules
+**The Sharp Corners Rule.** Nothing in this system rounds past 3px. A control that looks softly rounded is off-system regardless of context.
 
-  /* Typography — Scale */
-  --text-caption: 12px;
-  --leading-caption: 1.5;
-  --tracking-caption: -0.3px;
-  --text-body: 14px;
-  --leading-body: 1.5;
-  --tracking-body: -0.35px;
-  --text-heading-sm: 26px;
-  --leading-heading-sm: 1.25;
-  --tracking-heading-sm: -0.52px;
-  --text-heading: 48px;
-  --leading-heading: 1.1;
-  --tracking-heading: -0.96px;
+## Components
 
-  /* Typography — Weights */
-  --font-weight-w340: 340;
-  --font-weight-regular: 400;
-  --font-weight-bold: 700;
+### Buttons
+- **Shape:** 2px radius, 32px height (44px on coarse/touch pointers), inline-flex with 6px icon gap.
+- **Primary:** solid accent background, white text, `border-color: accent` (`.btn-primary`). Hover darkens to `--accent-2`.
+- **Secondary (default `.btn`):** surface background, `border-2` stroke, text-primary color. Hover moves to `--surface-2`.
+- **Ghost:** transparent background and border, `text-2` color; used for icon-only dismiss/utility actions (`.btn-ghost.btn-icon`).
+- **State:** `:active` scales to 0.97 (transform only); disabled drops to 0.5 opacity and disables pointer events. No focus ring color change beyond the shared `:focus-visible` outline.
 
-  /* Spacing */
-  --spacing-4: 4px;
-  --spacing-6: 6px;
-  --spacing-8: 8px;
-  --spacing-10: 10px;
-  --spacing-12: 12px;
-  --spacing-14: 14px;
-  --spacing-16: 16px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-32: 32px;
-  --spacing-36: 36px;
-  --spacing-40: 40px;
-  --spacing-48: 48px;
-  --spacing-224: 224px;
+### Chips
+- **Style:** surface background, `border-2` stroke, 26px height, 2px (pill-token) radius, a muted key segment (`.chip .k`) before the value.
+- **State:** dismissible chips carry a circular remove button that fills `--surface-3` on hover; used for active pivot filters.
 
-  /* Layout */
-  --page-max-width: 1200px;
-  --section-gap: 64-80px;
-  --card-padding: 24px;
-  --element-gap: 6px;
+### Badges
+- **Style:** 20px height, `--surface-3` background/`text-2` by default; semantic variants (`good`/`warn`/`bad`/`accent`) swap to the matching `-soft` background and solid text color. No border.
 
-  /* Border Radius */
-  --radius-sm: 2px;
-  --radius-md: 6px;
-  --radius-3xl: 32px;
-  --radius-3xl-2: 40px;
+### Cards / Containers
+- **Corner Style:** 3px radius (`--r-lg`).
+- **Background:** `--surface`, one step off `--bg`.
+- **Shadow Strategy:** none at rest; see Elevation & Depth.
+- **Border:** none.
+- **Internal Padding:** header `12px 16px` (min-height 48px, `.card-h`), body `16px` (`.card-b`).
 
-  /* Named Radii */
-  --radius-tags: 2px;
-  --radius-cards: 2px;
-  --radius-inputs: 2px;
-  --radius-buttons: 2px;
-  --radius-logotiles: 2px;
-  --radius-editorframe: 6px;
+### Inputs / Fields
+- **Style:** 32px height (44px coarse pointer), `border-2` stroke, `--r` (2px) radius, `--surface` background.
+- **Focus:** `:focus-visible` gets a 2px solid `--accent-fg` outline, 2px offset, shared globally (not input-specific).
+- **Placeholder:** `--text-3`.
 
-  /* Shadows */
-  --shadow-subtle: rgba(111, 123, 144, 0.1) 0px -2px 0px 0px inset;
-  --shadow-subtle-2: rgba(111, 123, 144, 0.05) 0px -2px 0px 0px inset;
-  --shadow-subtle-3: rgb(5, 55, 148) 0px -2px 0px 0px inset, rgb(230, 239, 254) 0px 1px 3px 0px;
-  --shadow-subtle-4: rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px;
-  --shadow-md: rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px;
+### Navigation (Rail / Bottom Tabs)
+- Desktop: fixed 56px icon rail, `--surface` background, single `border-right` hairline. Items are 40px rows, 2px radius, `text-2` at rest, hover to `--surface-2`/`text`. The active item gets `--accent-soft` background and `--accent-fg` text, no border, no underline.
+- Expanded rail (216px): labels fade in with opacity only (`railfade`, 180ms), never a width animation on the label itself, since the rail width switch is instant.
+- Hover on a collapsed item shows a dark tooltip (`--text` background, `--bg` text) offset right, `--pop-shadow`, opacity/transform transition.
+- Phone (≤860px): the rail becomes a fixed bottom tab bar, icon above 10px label, safe-area padding, no tooltips, no expand/collapse control.
 
-  /* Surfaces */
-  --surface-canvas: #e5e7eb;
-  --surface-card: #ffffff;
-  --surface-warm-surface: #f4f4f2;
-  --surface-blue-wash: #e6effe;
-  --surface-dark-frame: #282c33;
-}
-```
+### Segmented Control
+- **Style:** `--surface-3` track, 2px outer padding, transparent buttons at 28px height (40px touch) with `--r-sm` inner radius. Selected segment gets `--surface` background and `text` color; transitions on background/color only.
 
-### Tailwind v4
+### Chart Fill (signature)
+The line charts (live traffic, trend sparklines) render an SVG line (`.ln`) over an area that is, by default, an **ordered dither**: horizontal mask-repeated bands (`.dz i`, CSS `mask-repeat`) clipped under the area polygon, rather than a gradient or flat fill (`html[data-fx="dither"]`). A flat semi-transparent fill (`.ar`, 14% opacity) is the fallback when dither is toggled off. This is a deliberate, user-approved ("dither looks really cool") signature texture, not a decorative default; it stays confined to chart area fills and must not spread to card backgrounds or other surfaces.
 
-```css
-@theme {
-  /* Colors */
-  --color-hero-violet: #1348dc;
-  --color-signal-blue: #2b7fff;
-  --color-sky-tint: #8ec5ff;
-  --color-frost: #bedbff;
-  --color-slate-blue: #74ade8;
-  --color-ice-wash: #e6effe;
-  --color-deep-cobalt: #053794;
-  --color-silver-mist: #e5e7eb;
-  --color-pure-white: #ffffff;
-  --color-off-white: #f4f4f2;
-  --color-graphite: #3a3d43;
-  --color-charcoal: #464b57;
-  --color-slate: #5d636f;
-  --color-pewter: #6a7282;
-  --color-ash: #878a98;
-  --color-steel: #b2b5bb;
-  --color-fog: #cccfd3;
-  --color-mist: #dadde2;
-  --color-onyx: #282c33;
-  --color-midnight: #2f343e;
+## Do's and Don'ts
 
-  /* Typography */
-  --font-writer: 'Writer', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-plex-serif: 'Plex Serif', ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-zed-mono: 'Zed Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --font-ui-monospace: 'ui-monospace', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+### Do:
+- **Do** keep radii at 2-3px everywhere; nothing softly rounded.
+- **Do** express elevation as a background-color step (surface → surface-2 → surface-3), reserving `--pop-shadow` for content that leaves document flow (popovers, tooltips).
+- **Do** use `.num` tabular numerals on every number that appears in a column, delta, or live-updating readout.
+- **Do** limit the accent color to primary actions, active nav state, focus rings, and the primary chart series; everything else stays neutral or semantic (good/warn/bad).
+- **Do** animate only `transform` and `opacity`, 120-200ms, with the shared `--ease-out` curve, and respect `prefers-reduced-motion` (already wired globally).
+- **Do** show data freshness on every screen that reads cached or stored data, per PRODUCT.md's product principle.
+- **Do** keep the dither chart-fill technique scoped to chart areas; it's a signature texture for data visualization, not a general surface pattern.
+- **Do** honor the India map boundary rule (PoK, Gilgit-Baltistan, Aksai Chin, Ladakh, Jammu & Kashmir, Arunachal Pradesh, Kalapani-Lipulekh-Limpiyadhura as India, Natural Earth 10m India POV) on every map surface, including any future one; never ship default Natural Earth, world-atlas, or globe.gl country data.
 
-  /* Typography — Scale */
-  --text-caption: 12px;
-  --leading-caption: 1.5;
-  --tracking-caption: -0.3px;
-  --text-body: 14px;
-  --leading-body: 1.5;
-  --tracking-body: -0.35px;
-  --text-heading-sm: 26px;
-  --leading-heading-sm: 1.25;
-  --tracking-heading-sm: -0.52px;
-  --text-heading: 48px;
-  --leading-heading: 1.1;
-  --tracking-heading: -0.96px;
-
-  /* Spacing */
-  --spacing-4: 4px;
-  --spacing-6: 6px;
-  --spacing-8: 8px;
-  --spacing-10: 10px;
-  --spacing-12: 12px;
-  --spacing-14: 14px;
-  --spacing-16: 16px;
-  --spacing-20: 20px;
-  --spacing-24: 24px;
-  --spacing-32: 32px;
-  --spacing-36: 36px;
-  --spacing-40: 40px;
-  --spacing-48: 48px;
-  --spacing-224: 224px;
-
-  /* Border Radius */
-  --radius-sm: 2px;
-  --radius-md: 6px;
-  --radius-3xl: 32px;
-  --radius-3xl-2: 40px;
-
-  /* Shadows */
-  --shadow-subtle: rgba(111, 123, 144, 0.1) 0px -2px 0px 0px inset;
-  --shadow-subtle-2: rgba(111, 123, 144, 0.05) 0px -2px 0px 0px inset;
-  --shadow-subtle-3: rgb(5, 55, 148) 0px -2px 0px 0px inset, rgb(230, 239, 254) 0px 1px 3px 0px;
-  --shadow-subtle-4: rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px;
-  --shadow-md: rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px;
-}
-```
+### Don't:
+- **Don't** add a border to a card, page section, or other in-flow surface. Borders are for inputs, buttons, floating layers, and hairlines only.
+- **Don't** introduce a second accent color or a decorative gradient; one indigo, held in reserve, is the whole strategy.
+- **Don't** animate width, height, or layout-affecting properties for the sidebar or any panel; the rail switches width instantly and fades only labels.
+- **Don't** switch typefaces for hierarchy. Inter Variable's weight axis does that job; there is no separate display or mono-for-headings face.
+- **Don't** round corners past 3px, or use a fully circular "pill" shape for chips/badges; this system's pill token is 2px, deliberately sharp.
