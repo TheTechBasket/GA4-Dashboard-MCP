@@ -173,6 +173,8 @@ async function runSafeHistoricalReport({
   dateRange = { startDate: "28daysAgo", endDate: "today" },
   limit = 10,
   orderBys = null,
+  dimensionFilter = null,
+  metricAggregations = null,
   keyPath = CREDENTIALS_PATH,
 }) {
   const client = getGA4DataClient(keyPath);
@@ -192,19 +194,23 @@ async function runSafeHistoricalReport({
           : { metric: { metricName: currentMetrics[0].name }, desc: true },
       ];
 
-      const [response] = await client.runReport({
+      const request = {
         property: `properties/${propertyId}`,
         dimensions,
         metrics: currentMetrics,
         dateRanges: [dateRange],
         limit,
         orderBys: requestOrder,
-      });
+      };
+      if (dimensionFilter) request.dimensionFilter = dimensionFilter;
+      if (metricAggregations) request.metricAggregations = metricAggregations;
+      const [response] = await client.runReport(request);
 
       return {
         propertyId,
         ok: true,
         rows: response.rows || [],
+        totals: response.totals || [],
         dimensionHeaders: response.dimensionHeaders || [],
         metricHeaders: response.metricHeaders || [],
         usedMetrics: currentMetrics,

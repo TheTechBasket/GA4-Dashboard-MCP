@@ -10,6 +10,7 @@ const { runSafeHistoricalReport, runSafeRealtimeReport, CREDENTIALS_PATH } = req
 const { stripSensitiveGlobeUsersPayload } = require("./privacy");
 const { cacheGet, cacheSet, cacheCleanup } = require("./reportCache");
 const { analyticsUrl, websiteUrl } = require("./propertyActions");
+const { runExtraCard } = require("./reportExtras");
 
 const CACHE_DIR = path.join(__dirname, "..", ".cache");
 const PROPERTIES_CACHE_PATH = path.join(CACHE_DIR, "properties.json");
@@ -305,10 +306,30 @@ async function batchRealtimeReport({
         }),
     );
 
-    return {
-        data: results.filter((r) => r !== null),
-        quota: quotaAggregate,
-    };
+    const data = await Promise.all(results.filter((r) => r !== null).map(addLiveDetail));
+    return { data, quota: quotaAggregate };
+}
+
+// Per-minute active users (30 points, oldest first) and the usual-traffic baseline.
+// Quiet or failed properties skip both GA4 calls: their series is flat by definition.
+async function addLiveDetail(row) {
+    const series = Array(30).fill(0);
+    if (row.error || !row.activeUsers) return { ...row, series, baseline: null, baselineSd: null, baselineKind: null };
+    const { propertyBaseline } = require("./spikeDetector");
+    const [rt, base] = await Promise.all([
+        runSafeRealtimeReport({
+            propertyId: row.propertyId,
+            dimensions: [{ name: "minutesAgo" }],
+            metrics: [{ name: "activeUsers" }],
+            limit: 30,
+        }),
+        propertyBaseline({ id: row.propertyId }).catch(() => null),
+    ]);
+    for (const r of (rt.ok && rt.rows) || []) {
+        const m = parseInt(r.dimensionValues?.[0]?.value, 10);
+        if (m >= 0 && m < 30) series[29 - m] = parseInt(r.metricValues?.[0]?.value || "0", 10);
+    }
+    return { ...row, series, baseline: base ? base.baseline : null, baselineSd: base ? base.sd : null, baselineKind: base ? base.kind : null };
 }
 
 // ---------------------------------------------------------------------------
@@ -401,6 +422,10 @@ exports.allrealtime = async (req, res) => {
             dashboardUrl: r.dashboardUrl,
             analyticsUrl: analyticsUrl(r.propertyId),
             websiteUrl: websiteUrl(r.url),
+            series: r.series || null,
+            baseline: r.baseline ?? null,
+            baselineSd: r.baselineSd ?? null,
+            baselineKind: r.baselineKind ?? null,
         }));
 
         res.status(200).render("home", {
@@ -460,18 +485,21 @@ exports.quotaData = (req, res) => {
 /** GET /api/spikes – detects traffic spikes and analyzes referral sources */
 exports.trafficSpikes = async (req, res) => {
     try {
-        const cached = await cacheGet("spike", "all");
+        const { detectAllSpikes, parseSpikeOpts } = require("./spikeDetector");
+        const opts = parseSpikeOpts(req.query);
+        // One cache entry per rule, so different settings never share results.
+        const cacheKey = `all:z${opts.z}:l${opts.lift}`;
+        const cached = await cacheGet("spike", cacheKey);
         if (cached) {
             return res.json({ ...cached, cached: true });
         }
 
-        const { detectAllSpikes } = require("./spikeDetector");
         const cache = await getCachedProperties();
         const properties = cache?.properties ?? [];
 
-        const spikes = await detectAllSpikes(properties);
-        const payload = { ok: true, count: spikes.length, spikes };
-        cacheSet("spike", "all", payload).catch(() => {});
+        const spikes = await detectAllSpikes(properties, opts);
+        const payload = { ok: true, count: spikes.length, rule: opts, spikes };
+        cacheSet("spike", cacheKey, payload).catch(() => {});
         res.json(payload);
     } catch (err) {
         console.error("[spikes] Error detecting traffic spikes:", err.message);
@@ -856,17 +884,45 @@ exports.analyticsCard = async (req, res) => {
     const cfg    = getAnalyticsCardConfig(type);
     if (!cfg) return res.status(400).json({ error: `Unknown card type: ${type}` });
 
+    // Split cards take ?seg= (one cached query per segment)
+    const seg = cfg.segments
+        ? (cfg.segments[req.query.seg] ? req.query.seg : Object.keys(cfg.segments)[0])
+        : null;
+
     // ── Check cache first (skip caching for realtime-summary-like queries) ──
-    const cacheKey = `${propertyId}:${type}:${range}`;
+    const cacheKey = `${propertyId}:${type}:${range}` + (seg ? `:${seg}` : "");
     const cached = await cacheGet("card", cacheKey);
     if (cached) {
         return res.json({ ...cached, cached: true });
     }
 
     const dateRange = getDateRange(range);
-    // For time-series cards, match the limit to the range
+
+    if (cfg.kind) {
+        try {
+            const currencyCode = await getPropertyCurrencyCode(propertyId);
+            const props = (await getCachedProperties())?.properties || [];
+            const prop = props.find(p => String(p.id) === String(propertyId));
+            let ownHost = prop?.domain || "";
+            if (!ownHost && prop?.url) {
+                try { ownHost = new URL(prop.url).hostname; } catch { ownHost = ""; }
+            }
+            const extra = await runExtraCard({
+                cfg, type, propertyId, dateRange, seg, ownHost, run: runSafeHistoricalReport,
+            });
+            const payload = { ...extra, type, range, timeSeries: false, currencyCode };
+            cacheSet("card", cacheKey, payload).catch(() => {});
+            return res.json(payload);
+        } catch (err) {
+            console.error(`[analytics-card] ${type}:`, err.message);
+            return res.status(500).json({ error: err.message });
+        }
+    }
+
+    // Time-series cards: one row per day, or per hour for dateHour (8 / 29 days for 7d / 28d)
+    const days = range === "today" ? 1 : range === "7d" ? 8 : 29;
     const limit = cfg.timeSeries
-        ? (range === "today" ? 1 : range === "7d" ? 7 : 28)
+        ? (cfg.dimensions[0] === "dateHour" ? days * 24 : days)
         : cfg.limit;
 
     try {

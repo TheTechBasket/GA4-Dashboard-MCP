@@ -54,8 +54,9 @@ const CARD_CONFIGS = {
   },
   /* ── New Reports-section cards ─────────────────────────── */
   "source-engagement": {
+    kind: "engagement",
     dimensions: ["sessionSource", "sessionMedium"],
-    metrics: ["sessions", "activeUsers"],
+    metrics: ["sessions"],
     limit: 12,
   },
   "hourly-traffic": {
@@ -65,14 +66,41 @@ const CARD_CONFIGS = {
     timeSeries: true,
   },
   "content-engagement": {
+    kind: "engagement",
     dimensions: ["pagePath"],
-    metrics: ["screenPageViews", "activeUsers"],
+    metrics: ["sessions"],
     limit: 12,
   },
   "traffic-anomalies": {
     dimensions: ["sessionSource"],
     metrics: ["sessions", "activeUsers"],
     limit: 15,
+  },
+  /* Report extras (built by controllers/reportExtras.js) */
+  referrers: {
+    kind: "referrers",
+    dimensions: ["pageReferrer"],
+    metrics: ["sessions"],
+    limit: 50,
+  },
+  "source-split": {
+    kind: "split",
+    dimensions: ["sessionSource"],
+    metrics: ["sessions"],
+    segments: { source: "sessionSource", medium: "sessionMedium", platform: "platform" },
+    limit: 15,
+  },
+  "bot-traffic": {
+    kind: "bots",
+    dimensions: ["country", "city", "sessionSource", "deviceCategory"],
+    metrics: ["sessions"],
+    limit: 100,
+  },
+  "revenue-key-events": {
+    kind: "revenue",
+    dimensions: [],
+    metrics: ["keyEvents"],
+    limit: 20,
   },
 };
 
@@ -165,7 +193,7 @@ const CARD_CATALOG = [
     type: "source-engagement",
     title: "Traffic Quality",
     group: "Reports",
-    sub: "Sessions and active users by source",
+    sub: "Engagement rate, avg time and key events by source / medium",
     color: "#8b5cf6",
     bg: "rgba(139, 92, 246, 0.1)",
     icon: '<path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>',
@@ -176,7 +204,7 @@ const CARD_CATALOG = [
     group: "Reports",
     wide: true,
     chartCard: true,
-    sub: "Active users and pageviews by hour of day",
+    sub: "Active users and pageviews per hour",
     color: "#f59e0b",
     bg: "rgba(245, 158, 11, 0.1)",
     icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
@@ -185,7 +213,7 @@ const CARD_CATALOG = [
     type: "content-engagement",
     title: "Content Engagement",
     group: "Reports",
-    sub: "Top pages by pageviews and avg engagement time",
+    sub: "Top pages by sessions, engagement rate and avg time",
     color: "#06b6d4",
     bg: "rgba(6, 182, 212, 0.1)",
     icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
@@ -198,6 +226,44 @@ const CARD_CATALOG = [
     color: "#ef4444",
     bg: "rgba(239, 68, 68, 0.1)",
     icon: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  },
+  /* ── Report extras ─────────────────────────────────────── */
+  {
+    type: "referrers",
+    title: "Referrers",
+    group: "Acquisition",
+    wide: true,
+    sub: "Full referring URLs by platform, with engagement and key events",
+    color: "#4f46e5",
+    bg: "rgba(79, 70, 229, 0.1)",
+    icon: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  },
+  {
+    type: "source-split",
+    title: "Source, Medium, Platform",
+    group: "Acquisition",
+    sub: "Sessions with engagement rate, avg time and key events",
+    color: "#0891b2",
+    bg: "rgba(8, 145, 178, 0.1)",
+    icon: '<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  },
+  {
+    type: "bot-traffic",
+    title: "Suspected Bot Traffic",
+    group: "Audience",
+    sub: "Heuristic: low engagement or datacenter city",
+    color: "#b45309",
+    bg: "rgba(180, 83, 9, 0.1)",
+    icon: '<rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16.01"/><line x1="16" y1="16" x2="16" y2="16.01"/>',
+  },
+  {
+    type: "revenue-key-events",
+    title: "Revenue and Key Events",
+    group: "Revenue",
+    sub: "Ad and purchase revenue, key events by name",
+    color: "#15803d",
+    bg: "rgba(21, 128, 61, 0.1)",
+    icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
   },
 ];
 

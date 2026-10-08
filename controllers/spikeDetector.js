@@ -4,7 +4,7 @@
  * landing page trends, and traffic origins.
  */
 
-const { runSafeRealtimeReport, runSafeHistoricalReport } = require("./ga4Service");
+const { runSafeRealtimeReport, runSafeHistoricalReport, getGA4AdminClient } = require("./ga4Service");
 
 /**
  * Known referral domains & categories.
@@ -13,7 +13,7 @@ const { runSafeRealtimeReport, runSafeHistoricalReport } = require("./ga4Service
  */
 const REFERRAL_CATEGORIES = [
   { key: "hn", label: "Hacker News", shape: "forum", match: /ycombinator|news\.ycombinator/i },
-  { key: "twitter", label: "X / Twitter", shape: "social", match: /t\.co|twitter\.com|x\.com/i },
+  { key: "twitter", label: "X / Twitter", shape: "social", match: /(^|[/.])(t\.co|x\.com)(\/|$)|twitter\.com/i },
   { key: "reddit", label: "Reddit", shape: "forum", match: /reddit\.com|redd\.it/i },
   { key: "producthunt", label: "Product Hunt", shape: "social", match: /producthunt\.com/i },
   { key: "google", label: "Google Search", shape: "search", match: /google\./i },
@@ -25,7 +25,7 @@ const REFERRAL_CATEGORIES = [
   { key: "chatgpt", label: "ChatGPT / OpenAI", shape: "ai", match: /chatgpt|openai\.com|chat\.openai/i },
   { key: "tiktok", label: "TikTok", shape: "video", match: /tiktok\.com/i },
   { key: "discord", label: "Discord", shape: "social", match: /discord\.com|discord\.gg/i },
-  { key: "telegram", label: "Telegram", shape: "social", match: /t\.me|telegram\.org/i },
+  { key: "telegram", label: "Telegram", shape: "social", match: /(^|[/.])t\.me(\/|$)|telegram\.org/i },
   { key: "whatsapp", label: "WhatsApp", shape: "social", match: /whatsapp\.com/i },
   { key: "pinterest", label: "Pinterest", shape: "social", match: /pinterest\.com/i },
   { key: "medium", label: "Medium", shape: "forum", match: /medium\.com/i },
@@ -56,7 +56,7 @@ function classifyReferralSource(sourceStr) {
 
 /**
  * Average over days of each day's busiest hour, halved to match the 30-minute realtime window.
- * ponytail: peak-hour baseline, so off-peak surges below the usual peak are missed; compare same hour-of-day (needs property timezone) if that matters.
+ * Fallback when the property timezone is unknown.
  */
 function peakHalfHourBaseline(rows) {
   const peakByDay = {};
@@ -71,9 +71,123 @@ function peakHalfHourBaseline(rows) {
 }
 
 /**
+ * Same hour-of-day over the last 7 days (median, week-over-week), halved for the 30-minute window.
+ * Off-peak surges now count; dod/wow are the raw same-hour users yesterday and 7 days ago.
+ * Returns null when no row matches the hour, so the caller can fall back to the peak baseline.
+ */
+function sameHourBaseline(rows, hour) {
+  const byDay = {};
+  for (const r of rows || []) {
+    const dh = r.dimensionValues?.[0]?.value || "";
+    if (dh.slice(8, 10) !== hour) continue;
+    byDay[dh.slice(0, 8)] = parseInt(r.metricValues?.[0]?.value || "0", 10);
+  }
+  const days = Object.keys(byDay).sort();
+  if (days.length === 0) return null;
+  const halves = days.map((d) => byDay[d] / 2);
+  // Median and MAD (scaled to match sd on normal data), so one viral or dead day
+  // does not drag the usual level or widen the spread and hide a real surge.
+  const median = (xs) => {
+    const v = [...xs].sort((x, y) => x - y);
+    const m = v.length >> 1;
+    return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+  };
+  const avg = median(halves);
+  const sd = halves.length >= 3
+    ? Math.round(1.4826 * median(halves.map((v) => Math.abs(v - avg))) * 100) / 100
+    : null;
+  return {
+    baseline: Math.max(1, Math.round(avg)),
+    sd,
+    dod: byDay[days[days.length - 1]],
+    wow: days.length >= 7 ? byDay[days[0]] : null,
+  };
+}
+
+/**
+ * Spike score for one property. z is how many standard deviations "active" sits above the usual
+ * for this hour. Variance is the Poisson one (baseline + 1, so tiny means are not over-flagged),
+ * or the observed day-to-day spread when that is larger. ratio is the plain lift over usual.
+ * Spike: z >= opts.z and ratio >= opts.lift. Above usual: z >= 2 and ratio >= 1.15, not a spike.
+ * public/js/main.js mirrors this in spikeScore(); keep the two in step.
+ */
+const SPIKE_DEFAULTS = { z: 3, lift: 1.5 };
+
+function scoreSpike(active, baseline, sd, { z: zMin = SPIKE_DEFAULTS.z, lift = SPIKE_DEFAULTS.lift } = {}) {
+  if (!baseline) return { z: 0, ratio: 0, isSpike: false, above: false };
+  const variance = Math.max(baseline + 1, sd ? sd * sd : 0);
+  const z = (active - baseline) / Math.sqrt(variance);
+  const ratio = active / baseline;
+  const isSpike = z >= zMin && ratio >= lift;
+  return { z, ratio, isSpike, above: !isSpike && z >= 2 && ratio >= 1.15 };
+}
+
+/** Clamp ?z= and ?lift= query values; invalid or missing values fall back to the defaults. */
+function parseSpikeOpts(query = {}) {
+  const num = (v, lo, hi, def) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? Math.round(Math.min(hi, Math.max(lo, n)) * 100) / 100 : def;
+  };
+  return { z: num(query.z, 1.5, 6, SPIKE_DEFAULTS.z), lift: num(query.lift, 1, 5, SPIKE_DEFAULTS.lift) };
+}
+
+const tzCache = new Map();
+async function propertyTimeZone(propertyId) {
+  if (tzCache.has(propertyId)) return tzCache.get(propertyId);
+  let tz = null;
+  try {
+    const [p] = await getGA4AdminClient().getProperty({ name: `properties/${propertyId}` });
+    tz = p?.timeZone || null;
+  } catch (err) {
+    console.warn(`[spikeDetector] timezone lookup failed for ${propertyId}: ${err.message}`);
+  }
+  tzCache.set(propertyId, tz);
+  return tz;
+}
+
+function hourIn(timeZone, now = new Date()) {
+  return new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(now);
+}
+
+// History rows per property, kept 1 hour. The rows are cached (not the result)
+// so the same-hour pick follows the clock across an hour boundary.
+const BASELINE_TTL_MS = 60 * 60 * 1000;
+const historyCache = new Map();
+
+async function fetchHourlyHistory(propertyId) {
+  const res = await runSafeHistoricalReport({
+    propertyId,
+    dimensions: [{ name: "dateHour" }],
+    metrics: [{ name: "activeUsers" }],
+    dateRange: { startDate: "7daysAgo", endDate: "yesterday" },
+    limit: 7 * 24,
+  });
+  return res.ok ? res.rows : null;
+}
+
+/**
+ * Usual users for a 30-minute window right now: same hour of day over the last 7 days
+ * in the property timezone, else the average daily peak. Null when history fails.
+ * deps lets tests swap the GA4 calls and the clock.
+ */
+async function propertyBaseline(prop, deps = {}) {
+  const { fetchHistory = fetchHourlyHistory, timeZone = propertyTimeZone, now = new Date() } = deps;
+  let hit = historyCache.get(prop.id);
+  if (!hit || now.getTime() - hit.at >= BASELINE_TTL_MS) {
+    const [rows, tz] = await Promise.all([fetchHistory(prop.id), timeZone(prop.id)]);
+    if (!rows) return null;
+    hit = { at: now.getTime(), rows, tz };
+    historyCache.set(prop.id, hit);
+  }
+  const same = hit.tz ? sameHourBaseline(hit.rows, hourIn(hit.tz, now)) : null;
+  if (same) return { baseline: same.baseline, sd: same.sd, kind: "same-hour", dod: same.dod, wow: same.wow };
+  return { baseline: peakHalfHourBaseline(hit.rows), sd: null, kind: "peak", dod: null, wow: null };
+}
+
+/**
  * Detects traffic spikes across all available properties
  */
-async function detectAllSpikes(properties) {
+async function detectAllSpikes(properties, opts = {}) {
   if (!properties || properties.length === 0) return [];
 
   const results = await Promise.all(
@@ -94,21 +208,12 @@ async function detectAllSpikes(properties) {
           0
         );
 
-        // 2. Baseline: the usual busiest half hour over the last 7 days.
-        // Daily users / 48 assumed flat traffic, so every normal peak hour read as a spike.
-        const histRes = await runSafeHistoricalReport({
-          propertyId: prop.id,
-          dimensions: [{ name: "dateHour" }],
-          metrics: [{ name: "activeUsers" }],
-          dateRange: { startDate: "7daysAgo", endDate: "yesterday" },
-          limit: 7 * 24,
-        });
+        // 2. Baseline: this hour of day over the last 7 days, in the property timezone.
+        const base = await propertyBaseline(prop);
+        const avgBaseline = base ? base.baseline : 1;
+        const score = scoreSpike(totalActive, avgBaseline, base ? base.sd : null, opts);
 
-        const avgBaseline = histRes.ok ? peakHalfHourBaseline(histRes.rows) : 1;
-        const spikeRatio = totalActive / avgBaseline;
-        const isSpike = totalActive >= 4 && spikeRatio >= 1.7;
-
-        if (!isSpike) return null;
+        if (!score.isSpike) return null;
 
         // 3. Query Referral Sources & Landing Pages for this property
         const refRes = await runSafeHistoricalReport({
@@ -162,7 +267,13 @@ async function detectAllSpikes(properties) {
           domain: prop.domain || null,
           activeUsers: totalActive,
           baselineUsers: avgBaseline,
-          spikeMultiplier: Math.round(spikeRatio * 10) / 10,
+          baselineKind: base ? base.kind : "peak",
+          sameHourYesterday: base ? base.dod : null,
+          sameHourLastWeek: base ? base.wow : null,
+          baselineSd: base ? base.sd : null,
+          z: Math.round(score.z * 10) / 10,
+          ratio: Math.round(score.ratio * 100) / 100,
+          spikeMultiplier: Math.round(score.ratio * 10) / 10,
           topPage,
           topReferrals,
           primarySource: primaryRef ? primaryRef.classifiedName : "Direct / Search",
@@ -177,11 +288,17 @@ async function detectAllSpikes(properties) {
     })
   );
 
-  return results.filter((r) => r !== null).sort((a, b) => b.activeUsers - a.activeUsers);
+  return results.filter((r) => r !== null).sort((a, b) => b.z - a.z || b.activeUsers - a.activeUsers);
 }
 
 module.exports = {
   classifyReferralSource,
   detectAllSpikes,
   peakHalfHourBaseline,
+  sameHourBaseline,
+  propertyBaseline,
+  scoreSpike,
+  parseSpikeOpts,
+  SPIKE_DEFAULTS,
+  hourIn,
 };

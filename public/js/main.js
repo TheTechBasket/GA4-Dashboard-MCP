@@ -1,14 +1,14 @@
 /* ──────────────────────────────────────────────────────────────
    GA4 Dashboard & MCP: main.js
-   Handles: card reveal animations, count-up, quota bars,
-            auto-refresh toggle, cache refresh, sort, card expand,
-            privacy blur, quota live-polling, keyboard shortcuts,
-            toast notifications.
+   Loaded on every page. Home (live) rendering only runs when #liveHome exists.
+   Handles: live cards, spike banner, quota bars, auto-refresh, cache refresh,
+            privacy blur, keyboard shortcuts, toast notifications.
 ─────────────────────────────────────────────────────────────── */
 
+// One IIFE: page inline scripts (globe.hbs) declare some of the same top-level names.
+(() => {
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const QUOTA_POLL_MS       = 60 * 1000;      // 1 minute
-const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -19,204 +19,13 @@ function qNum(v) {
 }
 
 function formatRelativeTime(isoString) {
-  if (!isoString) return '—';
-  const diffMs = Date.now() - new Date(isoString).getTime();
-  const diffMin = Math.floor(diffMs / 60000);
+  if (!isoString) return 'unknown';
+  const diffMin = Math.floor((Date.now() - new Date(isoString).getTime()) / 60000);
   if (diffMin < 1) return 'just now';
   if (diffMin < 60) return `${diffMin}m ago`;
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) return `${diffH}h ago`;
   return `${Math.floor(diffH / 24)}d ago`;
-}
-
-function formatISO(isoString) {
-  if (!isoString) return '—';
-  try { return new Date(isoString).toLocaleString(); } catch { return isoString; }
-}
-
-// ── Card entrance animation ───────────────────────────────────
-
-function revealCards() {
-  const cards = document.querySelectorAll('.prop-card');
-  if (REDUCED_MOTION) { cards.forEach(c => c.classList.add('revealed')); return; }
-  cards.forEach((card, i) => {
-    setTimeout(() => {
-      card.style.transition =
-        'opacity 220ms cubic-bezier(0.215,0.61,0.355,1),' +
-        'transform 220ms cubic-bezier(0.215,0.61,0.355,1)';
-      card.classList.add('revealed');
-      setTimeout(() => { card.style.transition = ''; }, 260);
-    }, i * 35);
-  });
-}
-
-// ── Number count-up ───────────────────────────────────────────
-
-function countUp(el, target, duration) {
-  const end = parseInt(target, 10) || 0;
-  if (end === 0 || REDUCED_MOTION) { el.textContent = end.toLocaleString(); return; }
-  const start = performance.now();
-  function step(ts) {
-    const p = Math.min((ts - start) / duration, 1);
-    const eased = 1 - (1 - p) ** 2;
-    el.textContent = Math.round(eased * end).toLocaleString();
-    if (p < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
-function animateStatNumbers() {
-  document.querySelectorAll('.prop-stat-num[data-target]').forEach(el => {
-    const target = el.dataset.target;
-    const duration = Math.min(200 + parseInt(target, 10) * 2, 900);
-    const cardIndex = [...document.querySelectorAll('.prop-card')]
-      .indexOf(el.closest('.prop-card'));
-    setTimeout(() => countUp(el, target, duration), cardIndex * 35 + 100);
-  });
-  const totalEl = document.getElementById('jsTotal');
-  const viewsEl = document.getElementById('jsTotalViews');
-  if (totalEl) countUp(totalEl, totalEl.textContent, 800);
-  if (viewsEl) countUp(viewsEl, viewsEl.textContent, 800);
-}
-
-// ── Quota bars ────────────────────────────────────────────────
-
-const QUOTA_DEFS = [
-  { key: 'tokensPerProjectPerHour', label: 'Project · Hour', note: '(shared pool)' },
-  { key: 'tokensPerHour',           label: 'Property · Hour', note: '' },
-  { key: 'tokensPerDay',            label: 'Property · Day',  note: '' },
-];
-
-function barColorClass(pct) {
-  if (pct > 80) return 'danger';
-  if (pct > 50) return 'amber';
-  return '';
-}
-
-function renderQuotaBars(quota) {
-  const metersEl = document.getElementById('quotaMeters');
-  const noneEl   = document.getElementById('quotaNone');
-  if (!metersEl || !quota) return;
-
-  noneEl && (noneEl.style.display = 'none');
-  // Clear existing dynamic bars (keep noneEl)
-  metersEl.querySelectorAll('.quota-meter').forEach(el => el.remove());
-
-  QUOTA_DEFS.forEach(def => {
-    const raw = quota[def.key];
-    if (!raw) return;
-    const consumed  = qNum(raw.consumed);
-    const remaining = qNum(raw.remaining);
-    const total     = consumed + remaining;
-    if (total === 0) return;
-    const pct = Math.round((consumed / total) * 100);
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'quota-meter';
-    wrapper.innerHTML = `
-      <div class="qm-head">
-        <span class="qm-name">${def.label} <span style="font-weight:400;opacity:.6">${def.note}</span></span>
-        <span class="qm-val">${consumed.toLocaleString()} / ${total.toLocaleString()} &nbsp;(${pct}%)</span>
-      </div>
-      <div class="qm-bar-bg">
-        <div class="qm-bar-fill ${barColorClass(pct)}" data-pct="${pct}" style="width:0"></div>
-      </div>
-    `;
-    metersEl.appendChild(wrapper);
-  });
-
-  if (!REDUCED_MOTION) {
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        document.querySelectorAll('.qm-bar-fill').forEach(el => {
-          el.style.width = el.dataset.pct + '%';
-        });
-      }, 80);
-    });
-  } else {
-    document.querySelectorAll('.qm-bar-fill').forEach(el => {
-      el.style.width = el.dataset.pct + '%';
-      el.style.transition = 'none';
-    });
-  }
-
-  // Show updated-at time if present
-  if (quota.updatedAt) {
-    let tsEl = document.getElementById('quotaUpdatedAt');
-    if (!tsEl) {
-      tsEl = document.createElement('div');
-      tsEl.id = 'quotaUpdatedAt';
-      tsEl.style.cssText = 'font-size:10px;color:var(--xmuted);margin-top:6px;';
-      document.getElementById('quotaPanel')?.appendChild(tsEl);
-    }
-    tsEl.textContent = `Updated ${formatRelativeTime(quota.updatedAt)}`;
-  }
-}
-
-function buildQuotaBars() { renderQuotaBars(window.QUOTA); }
-
-// ── Live quota polling ────────────────────────────────────────
-
-async function pollQuota() {
-  try {
-    const res  = await fetch('/api/quota');
-    const json = await res.json();
-    if (json.ok && json.quota) {
-      window.QUOTA = json.quota;
-      renderQuotaBars(json.quota);
-    }
-  } catch { /* silent */ }
-}
-
-setInterval(pollQuota, QUOTA_POLL_MS);
-
-// ── Sort cards ────────────────────────────────────────────────
-
-const SORT_KEY = 'pb_sort';
-
-function sortCards(by) {
-  const grid  = document.getElementById('propGrid');
-  if (!grid) return;
-  const cards = [...grid.querySelectorAll('.prop-card')];
-
-  cards.sort((a, b) => {
-    if (by === 'active') return parseInt(b.dataset.active || 0) - parseInt(a.dataset.active || 0);
-    if (by === 'views')  return parseInt(b.dataset.views  || 0) - parseInt(a.dataset.views  || 0);
-    if (by === 'name') {
-      const an = (a.dataset.name || '').toLowerCase();
-      const bn = (b.dataset.name || '').toLowerCase();
-      return an < bn ? -1 : an > bn ? 1 : 0;
-    }
-    return 0;
-  });
-
-  // Re-order DOM nodes
-  cards.forEach(c => grid.appendChild(c));
-
-  // Update active button
-  document.querySelectorAll('.sort-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.sort === by);
-  });
-
-  localStorage.setItem(SORT_KEY, by);
-}
-
-document.querySelectorAll('.sort-btn').forEach(btn => {
-  btn.addEventListener('click', () => sortCards(btn.dataset.sort));
-});
-
-// Apply saved sort on load
-const savedSort = localStorage.getItem(SORT_KEY);
-if (savedSort) sortCards(savedSort);
-
-// ── Card expand (click → load detail) ────────────────────────
-
-const detailCache = {}; // pid → data, to avoid re-fetching
-const visitorInsightCache = {}; // `${pid}:${range}` → aggregate visitor intent data
-
-function flagEmoji(id) {
-  if (!id || id.length !== 2) return '';
-  return String.fromCodePoint(...[...id.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0)));
 }
 
 function escHtmlMain(str) {
@@ -228,368 +37,364 @@ function escHtmlMain(str) {
     .replace(/'/g, '&#39;');
 }
 
-function formatDuration(seconds) {
-  const total = Math.max(0, Math.round(Number(seconds) || 0));
-  if (total < 60) return `${total}s`;
-  const mins = Math.floor(total / 60);
-  const secs = total % 60;
-  if (mins < 60) return secs ? `${mins}m ${secs}s` : `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  const rem = mins % 60;
-  return rem ? `${hours}h ${rem}m` : `${hours}h`;
-}
+// ── Quota bars ────────────────────────────────────────────────
 
-function formatGaDate(value) {
-  const raw = String(value || '');
-  if (/^\d{8}$/.test(raw)) {
-    return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
-  }
-  return raw || '—';
-}
+const QUOTA_DEFS = [
+  { key: 'tokensPerProjectPerHour', label: 'Project, hour', note: 'shared pool' },
+  { key: 'tokensPerHour',           label: 'Property, hour', note: '' },
+  { key: 'tokensPerDay',            label: 'Property, day',  note: '' },
+];
 
-function renderPersonaSection(pid) {
-  return `
-    <div class="cd-section persona-section" id="persona-${pid}">
-      <div class="persona-head">
-        <div class="cd-title" style="margin:0">Visitor intent</div>
-        <div class="persona-range" aria-label="Visitor insight range">
-          <button type="button" class="active" data-pid="${pid}" data-range="28d">28d</button>
-          <button type="button" data-pid="${pid}" data-range="7d">7d</button>
-          <button type="button" data-pid="${pid}" data-range="today">Today</button>
-        </div>
+function renderQuotaBars(quota) {
+  const metersEl = document.getElementById('quotaMeters');
+  if (!metersEl || !quota) return;
+  const noneEl = document.getElementById('quotaNone');
+  if (noneEl) noneEl.hidden = true;
+  metersEl.querySelectorAll('.quota-meter').forEach(el => el.remove());
+
+  QUOTA_DEFS.forEach(def => {
+    const raw = quota[def.key];
+    if (!raw) return;
+    const consumed = qNum(raw.consumed);
+    const total = consumed + qNum(raw.remaining);
+    if (total === 0) return;
+    const pct = Math.round((consumed / total) * 100);
+    const el = document.createElement('div');
+    el.className = 'quota-meter';
+    el.innerHTML = `
+      <div class="qm-head">
+        <span>${def.label}${def.note ? ` <span class="faint">(${def.note})</span>` : ''}</span>
+        <span class="num">${consumed.toLocaleString()} / ${total.toLocaleString()} (${pct}%)</span>
       </div>
-      <div class="persona-loading cd-loading">Loading aggregate visitor insights...</div>
-    </div>`;
-}
-
-function renderDetail(pid, data) {
-  const el = document.getElementById('cardModalBody');
-  if (!el) return;
-  const max = arr => Math.max(1, ...arr.map(r => r.users ?? r.views ?? r.count));
-
-  const rows = (arr, field, labelFn) =>
-    arr.slice(0, 5).map(r => {
-      const val = r.users ?? r.views ?? r.count ?? 0;
-      const pct = Math.round(val / max(arr) * 100);
-      return `
-        <div class="cd-row">
-          <span style="flex-shrink:0;font-size:13px">${labelFn(r)}</span>
-          <div class="cd-bar-wrap"><div class="cd-bar" style="width:${pct}%"></div></div>
-          <span class="cd-num">${val}</span>
-        </div>`;
-    }).join('');
-
-  const liveBadge = '<span class="cd-live-badge"><span class="live-dot"></span>LIVE · 30 MIN</span>';
-
-  const countriesHtml = data.countries?.length ? `
-    <div class="cd-section">
-      <div class="cd-title">Countries${liveBadge}</div>
-      ${rows(data.countries, 'users', r => `${flagEmoji(r.id)} ${escHtmlMain(r.name)}`)}
-    </div>` : '';
-
-  const eventsHtml = data.events?.length ? `
-    <div class="cd-section">
-      <div class="cd-title">Top Events${liveBadge}</div>
-      ${rows(data.events, 'users', r => escHtmlMain(r.name || '(unknown)'))}
-    </div>` : '';
-
-  const pagesHtml = data.pages?.length ? `
-    <div class="cd-section">
-      <div class="cd-title">Top Pages${liveBadge}</div>
-      ${data.pages.slice(0, 5).map(r => {
-        const pct = Math.round(r.views / Math.max(1, ...data.pages.map(x => x.views)) * 100);
-        return `
-          <div class="cd-row">
-            <span class="cd-page" title="${escHtmlMain(r.path)}">${escHtmlMain(r.path)}</span>
-            <div class="cd-bar-wrap"><div class="cd-bar" style="width:${pct}%"></div></div>
-            <span class="cd-num">${r.views}</span>
-          </div>`;
-      }).join('')}
-    </div>` : '';
-
-  const personaHtml = renderPersonaSection(pid);
-  const empty = !countriesHtml && !eventsHtml && !pagesHtml;
-  el.innerHTML = empty
-    ? '<div class="cd-loading" style="color:var(--xmuted)">No real-time data right now.</div>' + personaHtml
-    : countriesHtml + eventsHtml + pagesHtml + personaHtml;
-  wirePersonaRange(pid);
-  loadVisitorInsights(pid, '28d');
-}
-
-function personaMetric(label, value) {
-  return `
-    <div class="persona-metric">
-      <strong>${escHtmlMain(value)}</strong>
-      <span>${escHtmlMain(label)}</span>
-    </div>`;
-}
-
-function renderVisitorInsights(pid, data, range) {
-  const target = document.getElementById(`persona-${pid}`);
-  if (!target) return;
-  target.querySelectorAll('.persona-range button').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.range === range);
+      <div class="qm-bar-bg"><div class="qm-bar-fill ${pct > 80 ? 'danger' : pct > 50 ? 'amber' : ''}" style="--pct:${pct / 100}"></div></div>`;
+    metersEl.appendChild(el);
   });
 
-  if (!data.ok || !Array.isArray(data.personas) || data.personas.length === 0) {
-    const message = data.error || 'No aggregate visitor intent data for this range.';
-    target.innerHTML = `
-      <div class="persona-head">
-        <div class="cd-title" style="margin:0">Visitor intent</div>
-        <div class="persona-range" aria-label="Visitor insight range">
-          <button type="button" data-pid="${pid}" data-range="28d" class="${range === '28d' ? 'active' : ''}">28d</button>
-          <button type="button" data-pid="${pid}" data-range="7d" class="${range === '7d' ? 'active' : ''}">7d</button>
-          <button type="button" data-pid="${pid}" data-range="today" class="${range === 'today' ? 'active' : ''}">Today</button>
-        </div>
-      </div>
-      <div class="persona-note">${escHtmlMain(message)}</div>`;
-    wirePersonaRange(pid);
-    return;
+  const tsEl = document.getElementById('quotaUpdatedAt');
+  if (tsEl && quota.updatedAt) tsEl.textContent = `Updated ${formatRelativeTime(quota.updatedAt)}`;
+}
+
+if (document.getElementById('quotaMeters')) {
+  setInterval(async () => {
+    try {
+      const json = await (await fetch('/api/quota')).json();
+      if (json.ok && json.quota) renderQuotaBars(json.quota);
+    } catch { /* silent */ }
+  }, QUOTA_POLL_MS);
+}
+
+// ── Live home: variant C cards ────────────────────────────────
+
+(function liveHome() {
+  const root = document.getElementById('liveHome');
+  if (!root || typeof PAGE_DATA === 'undefined') return;
+
+  // Spike rule: viewer-tunable, saved per browser. Defaults match controllers/spikeDetector.js SPIKE_DEFAULTS.
+  const RULE_KEY = 'ga4dash.spikeRule';
+  const PRESETS = { sensitive: { z: 2.5, lift: 1.3 }, normal: { z: 3, lift: 1.5 }, strict: { z: 4, lift: 2 } };
+  const clampRule = r => {
+    const c = (v, lo, hi, d) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(Math.min(hi, Math.max(lo, n)) * 100) / 100 : d; };
+    return { z: c(r && r.z, 1.5, 6, PRESETS.normal.z), lift: c(r && r.lift, 1, 5, PRESETS.normal.lift) };
+  };
+  let rule = (() => {
+    try { return clampRule(JSON.parse(localStorage.getItem(RULE_KEY) || 'null') || PRESETS.normal); } catch { return { ...PRESETS.normal }; }
+  })();
+
+  // Same math as scoreSpike() in controllers/spikeDetector.js; keep the two in step.
+  function spikeScore(active, baseline, sd, r) {
+    if (!baseline) return { z: 0, ratio: 0, isSpike: false, above: false };
+    const z = (active - baseline) / Math.sqrt(Math.max(baseline + 1, sd ? sd * sd : 0));
+    const ratio = active / baseline;
+    const isSpike = z >= r.z && ratio >= r.lift;
+    return { z, ratio, isSpike, above: !isSpike && z >= 2 && ratio >= 1.15 };
   }
+  const nf = n => Number(n || 0).toLocaleString();
+  const ICON = {
+    ga: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>',
+    report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 17v-4M12 17V7M16 17v-7"/></svg>',
+    ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+  };
 
-  const cards = data.personas.slice(0, 3).map((persona, idx) => {
-    const topPages = (persona.topPages || []).slice(0, 4).map(page => `
-      <div class="persona-list-row">
-        <span title="${escHtmlMain(page.path)}" data-privacy>${escHtmlMain(page.path)}</span>
-        <strong>${Number(page.views || 0).toLocaleString()} views</strong>
-      </div>`).join('') || '<div class="persona-note">No page path breakdown available.</div>';
+  // Server rows carry analyticsUrl/websiteUrl; /api/realtime-all rows carry fresh numbers.
+  let rows = PAGE_DATA.map(p => ({ ...p }));
+  let hydrated = PAGE_DATA.some(p => Array.isArray(p.series));
+  let updatedAt = hydrated ? new Date() : null;
+  const reasons = {}; // propertyId -> spike reasonSummary from /api/spikes
 
-    const timeline = (persona.timeline || []).slice(-5).map(day => `
-      <div class="persona-list-row">
-        <span>${escHtmlMain(formatGaDate(day.date))}</span>
-        <strong>${Number(day.activeUsers || 0).toLocaleString()} users · ${formatDuration(day.avgEngagementSeconds || 0)}</strong>
-      </div>`).join('') || '<div class="persona-note">No timeline available.</div>';
-
-    return `
-      <article class="persona-card ${idx === 0 ? 'is-open' : ''}" data-persona-card>
-        <div class="persona-card-main">
-          <div>
-            <div class="persona-name">${escHtmlMain(persona.label || 'Visitor segment')}</div>
-            <div class="persona-intent">${escHtmlMain(persona.intent || 'Browsing')} · ${escHtmlMain(persona.channel || 'Unknown channel')}</div>
-          </div>
-          <div class="persona-note">${escHtmlMain(persona.visitType || 'Aggregate')}</div>
-        </div>
-        <div class="persona-metrics">
-          ${personaMetric('users', Number(persona.activeUsers || 0).toLocaleString())}
-          ${personaMetric('engagement', formatDuration(persona.avgEngagementSeconds || 0))}
-          ${personaMetric('engaged', `${Number(persona.engagementRate || 0).toLocaleString()}%`)}
-          ${personaMetric('sessions', Number(persona.sessions || 0).toLocaleString())}
-          ${personaMetric('key events', Number(persona.keyEvents || 0).toLocaleString())}
-        </div>
-        <div class="persona-detail">
-          <div>
-            <div class="persona-mini-title">Page path history</div>
-            ${topPages}
-          </div>
-          <div>
-            <div class="persona-mini-title">Engagement timeline</div>
-            ${timeline}
-          </div>
-        </div>
-      </article>`;
-  }).join('');
-
-  target.innerHTML = `
-    <div class="persona-head">
-      <div>
-        <div class="cd-title" style="margin:0">Visitor intent</div>
-        <div class="persona-note">${escHtmlMain(data.note || 'Aggregate GA4 segment data.')} · reports data, not live</div>
-      </div>
-      <div class="persona-range" aria-label="Visitor insight range">
-        <button type="button" data-pid="${pid}" data-range="28d" class="${range === '28d' ? 'active' : ''}">28d</button>
-        <button type="button" data-pid="${pid}" data-range="7d" class="${range === '7d' ? 'active' : ''}">7d</button>
-        <button type="button" data-pid="${pid}" data-range="today" class="${range === 'today' ? 'active' : ''}">Today</button>
-      </div>
-    </div>
-    <div class="persona-grid">${cards}</div>
-  `;
-  wirePersonaRange(pid);
-  target.querySelectorAll('[data-persona-card]').forEach(card => {
-    card.addEventListener('click', (event) => {
-      if (event.target.closest('.persona-range')) return;
-      card.classList.toggle('is-open');
+  function model() {
+    const props = rows.map(p => {
+      const active = p.activeUsers || 0;
+      const s = spikeScore(active, p.baseline, p.baselineSd, rule);
+      return { ...p, active, views: p.pageViews || 0, series: p.series || Array(30).fill(0), x: s.ratio, z: s.z, spike: s.isSpike, above: s.above };
     });
-  });
-}
-
-function wirePersonaRange(pid) {
-  const target = document.getElementById(`persona-${pid}`);
-  if (!target) return;
-  target.querySelectorAll('.persona-range button').forEach(btn => {
-    btn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      loadVisitorInsights(btn.dataset.pid, btn.dataset.range);
-    });
-  });
-}
-
-async function loadVisitorInsights(pid, range = '28d') {
-  const target = document.getElementById(`persona-${pid}`);
-  if (!target) return;
-  const cacheKey = `${pid}:${range}`;
-  if (visitorInsightCache[cacheKey]) {
-    renderVisitorInsights(pid, visitorInsightCache[cacheKey], range);
-    return;
+    // Rank by z: how unusual right now, so a handful of users never tops the list on ratio alone.
+    const ok = props.filter(p => !p.error);
+    const live = ok.filter(p => p.active > 0).sort((a, b) => b.z - a.z || b.active - a.active);
+    return {
+      live,
+      spikes: live.filter(p => p.spike),
+      quiet: ok.filter(p => !p.active),
+      errors: props.filter(p => p.error),
+      total: ok.reduce((s, p) => s + p.active, 0),
+      views: ok.reduce((s, p) => s + p.views, 0),
+      combined: Array.from({ length: 30 }, (_, i) => ok.reduce((s, p) => s + (p.series[i] || 0), 0)),
+    };
   }
 
-  const loading = target.querySelector('.persona-loading');
-  if (loading) loading.textContent = 'Loading aggregate visitor insights...';
-  try {
-    const res = await fetch(`/api/visitor-insights/${pid}?range=${encodeURIComponent(range)}`);
-    const json = await res.json();
-    visitorInsightCache[cacheKey] = json;
-    renderVisitorInsights(pid, json, range);
-  } catch {
-    renderVisitorInsights(pid, { ok: false, error: 'Network error loading visitor insights.' }, range);
-  }
-}
-
-async function loadCardDetail(pid) {
-  const detailEl = document.getElementById('cardModalBody');
-  if (!detailEl) return;
-
-  if (detailCache[pid]) {
-    // Already fetched — just re-render
-    renderDetail(pid, detailCache[pid]);
-    return;
-  }
-
-  try {
-    const res  = await fetch(`/api/property-detail/${pid}`);
-    const json = await res.json();
-    if (json.ok) {
-      detailCache[pid] = json;
-      renderDetail(pid, json);
-    } else {
-      detailEl.textContent = json.error || 'Error loading data';
-      detailEl.style.color = 'var(--danger)';
-      detailEl.className = 'cd-loading';
+  let uid = 0;
+  function areaChart(values, { w = 720, h = 160, axis = true } = {}) {
+    const id = 'dz' + (++uid);
+    const max = Math.max(1, ...values);
+    const top = axis ? 10 : 2, bottom = axis ? 18 : 2, left = axis ? 28 : 0;
+    const iw = w - left, ih = h - top - bottom;
+    const x = i => left + (i / (values.length - 1)) * iw;
+    const y = v => top + ih - (v / max) * ih;
+    const pts = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const area = `${left},${top + ih} ${pts} ${w},${top + ih}`;
+    let g = '';
+    if (axis) {
+      const mid = max <= 4 ? max : Math.ceil(max / 2);
+      for (const v of new Set([0, mid, max])) g += `<line class="grid" x1="${left}" x2="${w}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${left - 6}" y="${y(v) + 3}" text-anchor="end">${v}</text>`;
+      for (const m of [29, 20, 10, 0]) g += `<text class="axis" x="${x(29 - m)}" y="${h - 4}" text-anchor="${m === 29 ? 'start' : m === 0 ? 'end' : 'middle'}">${m === 0 ? 'now' : '-' + m + 'm'}</text>`;
     }
-  } catch {
-    detailEl.innerHTML = '<div class="cd-loading" style="color:var(--danger)">Network error</div>';
-  }
-}
-
-// ── Card detail modal ──────────────────────────────────────────
-// One shared <dialog>, populated per-property on open — avoids stretching
-// the grid the way an inline per-card expand used to.
-
-const cardModal     = document.getElementById('cardModal');
-const cardModalBody = document.getElementById('cardModalBody');
-
-function openCardModal(pid) {
-  const card = document.querySelector(`.prop-card[data-pid="${pid}"]`);
-  if (!card || !cardModal) return;
-
-  const name = card.dataset.name || '';
-  const info = (typeof PAGE_DATA !== 'undefined' ? PAGE_DATA : []).find(p => String(p.propertyId) === String(pid));
-
-  document.getElementById('cardModalName').textContent = name;
-  document.getElementById('cardModalSub').textContent = info?.domain || `Property ${pid}`;
-  const linkBtn = document.getElementById('cardModalLink');
-  if (linkBtn) linkBtn.href = info?.dashboardUrl || '#';
-
-  if (!detailCache[pid]) {
-    cardModalBody.innerHTML = `
-      <div class="cd-loading">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 700ms linear infinite">
-          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-        </svg>
-        Loading…
-      </div>`;
+    const last = values[values.length - 1];
+    return `<svg viewBox="0 0 ${w} ${h}" ${axis ? '' : 'preserveAspectRatio="none"'} role="img" aria-label="Active users per minute, last 30 minutes, peak ${max}">
+      <defs><pattern id="${id}p" width="4" height="3" patternUnits="userSpaceOnUse"><rect width="4" height="1" class="dz" opacity=".55"/></pattern>
+      <clipPath id="${id}c"><polygon points="${area}"/></clipPath></defs>
+      ${g}<rect x="${left}" y="${top}" width="${iw}" height="${ih}" fill="url(#${id}p)" clip-path="url(#${id}c)"/>
+      <polyline class="ln" points="${pts}" vector-effect="non-scaling-stroke"/>
+      ${axis ? `<circle class="end" cx="${x(values.length - 1)}" cy="${y(last)}" r="3"/>` : ''}</svg>`;
   }
 
-  if (typeof cardModal.showModal === 'function') cardModal.showModal();
-  loadCardDetail(pid);
-}
+  const usualText = p => (p.baselineKind === 'same-hour' ? 'usual for this hour' : 'usual peak');
+  // Floor, so 1.49 never reads as the 1.5 lift line.
+  const fx = p => (Math.floor(p.x * 10) / 10).toFixed(1);
+  const xLabel = p => (p.baseline ? `${fx(p)}x usual` : 'No baseline yet');
 
-document.querySelectorAll('.prop-actions-toggle').forEach(toggle => {
-  toggle.addEventListener('click', event => {
-    event.stopPropagation();
-    const menu = document.getElementById(toggle.getAttribute('aria-controls'));
-    if (!menu) return;
-    const isOpen = !menu.hidden;
-    menu.hidden = isOpen;
-    toggle.setAttribute('aria-expanded', String(!isOpen));
-  });
-});
+  function meter(p) {
+    if (!p.baseline) return '<span></span>';
+    // Full width is lift / 0.75, so the lift tick always sits at 75%.
+    const full = rule.lift / 0.75;
+    const pct = Math.min(p.x / full, 1) * 100;
+    const spread = p.baselineSd != null ? `, day-to-day spread ${p.baselineSd.toFixed(1)}` : '';
+    const tip = `${p.x.toFixed(2)}x ${usualText(p)}, z ${p.z.toFixed(1)} (${nf(p.active)} now, usual ${nf(p.baseline)}${spread}). Spike at z ${rule.z} and ${rule.lift}x.`;
+    return `<div class="meter" title="${escHtmlMain(tip)}"><i class="${p.spike ? 'hot' : ''}" style="width:${pct}%"></i><b style="left:75%"></b></div>`;
+  }
 
-document.querySelectorAll('[data-card-action]').forEach(link => {
-  link.addEventListener('click', event => event.stopPropagation());
-});
+  function card(p) {
+    const domain = p.domain || `Property ${p.propertyId}`;
+    const badge = p.spike
+      ? '<span class="badge warn">Spike</span>'
+      : p.above ? '<span class="badge accent">Above usual</span>' : '';
+    const ga = `https://analytics.google.com/analytics/web/#/p${encodeURIComponent(p.propertyId)}/reports/intelligenthome`;
+    const report = p.analyticsUrl || `/analytics?prop=${encodeURIComponent(p.propertyId)}`;
+    return `<article class="card pc ${p.spike ? 'hot' : ''}" data-pid="${escHtmlMain(p.propertyId)}">
+      <div class="top"><div class="site"><b data-privacy>${escHtmlMain(p.siteName)}</b><span data-privacy>${escHtmlMain(domain)}</span></div>${badge}</div>
+      <div class="nums"><div><span class="n num">${nf(p.active)}</span><span class="faint cap">active</span></div><div><span class="n v num">${nf(p.views)}</span><span class="faint cap">views</span></div></div>
+      <div class="chart">${areaChart(p.series, { axis: false, w: 260, h: 44 })}</div>
+      <div class="foot">${meter(p)}<span class="num cap ${p.spike ? 'x-hot' : 'muted'}">${xLabel(p)}</span></div>
+      <div class="pc-actions">
+        <a class="btn btn-ghost btn-sm" href="${ga}" target="_blank" rel="noopener">${ICON.ga}Open GA4</a>
+        <a class="btn btn-ghost btn-sm" href="${escHtmlMain(report)}">${ICON.report}Report</a>
+        ${p.websiteUrl ? `<a class="btn btn-ghost btn-sm" href="${escHtmlMain(p.websiteUrl)}" target="_blank" rel="noopener">${ICON.ext}Visit site</a>` : ''}
+      </div>
+    </article>`;
+  }
 
-document.querySelectorAll('.prop-card[data-pid]').forEach(card => {
-  card.addEventListener('click', function() {
-    openCardModal(this.dataset.pid);
-  });
-});
+  function spikeBanner(p) {
+    const why = reasons[p.propertyId] || `Usual ${p.baselineKind === 'same-hour' ? 'for this hour' : 'busiest half hour'}: ${nf(p.baseline)} users.`;
+    return `<div class="spike" role="status">
+      <span class="t"><span data-privacy>${escHtmlMain(p.siteName)}</span> · ${nf(p.active)} active, ${fx(p)}x ${usualText(p)}</span>
+      <span class="badge warn">Spike</span>
+      <span class="why" data-privacy>${escHtmlMain(why)}</span></div>`;
+  }
 
-document.getElementById('cardModalClose')?.addEventListener('click', () => cardModal.close());
-cardModal?.addEventListener('click', (e) => {
-  if (e.target === cardModal) cardModal.close(); // click on backdrop
-});
+  function render() {
+    const m = model();
+    document.getElementById('jsTotal').textContent = nf(m.total);
+    document.getElementById('jsTotalViews').textContent = nf(m.views);
+    document.getElementById('jsLiveCount').textContent = nf(m.live.length);
+    document.getElementById('jsCombined').innerHTML = areaChart(m.combined, { w: 560, h: 90 });
+
+    const banner = document.getElementById('spikeBanner');
+    banner.hidden = !m.spikes.length;
+    banner.innerHTML = m.spikes.map(spikeBanner).join('');
+
+    const grid = document.getElementById('propGrid');
+    grid.innerHTML = m.live.length
+      ? m.live.map(card).join('')
+      : `<div class="card empty">${hydrated ? 'No one on any property in the last 30 minutes.' : 'Loading live data.'}</div>`;
+
+    const quietCard = document.getElementById('quietCard');
+    quietCard.hidden = !(m.quiet.length || m.errors.length);
+    document.getElementById('quietNote').textContent =
+      `${m.quiet.length} with no one in the last 30 min` + (m.errors.length ? `, ${m.errors.length} with errors` : '');
+    document.getElementById('quietChips').innerHTML =
+      m.errors.map(p => `<span class="chip bad" title="${escHtmlMain(p.error)}"><span data-privacy>${escHtmlMain(p.siteName)}</span> · error</span>`).join('') +
+      m.quiet.map(p => `<a class="chip" href="${escHtmlMain(p.analyticsUrl || `/analytics?prop=${encodeURIComponent(p.propertyId)}`)}" title="Open report"><span data-privacy>${escHtmlMain(p.siteName)}</span></a>`).join('');
+
+    document.getElementById('lhUpdated').textContent = updatedAt
+      ? `Updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      : 'Loading live data';
+  }
+
+  async function hydrate() {
+    try {
+      const json = await (await fetch('/api/realtime-all')).json();
+      if (!json.ok || !Array.isArray(json.data)) return;
+      const byId = new Map(rows.map(r => [String(r.propertyId), r]));
+      rows = json.data.map(d => {
+        const base = byId.get(String(d.propertyId)) || {};
+        return { ...base, ...d, error: d.error ? (d.errorMessage || 'Error') : null, analyticsUrl: base.analyticsUrl, websiteUrl: base.websiteUrl };
+      });
+      hydrated = true;
+      updatedAt = new Date();
+      render();
+      if (json.quota) renderQuotaBars(json.quota);
+    } catch { /* keep the server-rendered numbers */ }
+  }
+
+  // Reasons come from the server run of the same rule; a stale response for an older rule is dropped.
+  let reasonsReq = 0;
+  async function loadSpikeReasons() {
+    const req = ++reasonsReq;
+    try {
+      const json = await (await fetch(`/api/spikes?z=${encodeURIComponent(rule.z)}&lift=${encodeURIComponent(rule.lift)}`)).json();
+      if (req !== reasonsReq) return;
+      for (const s of (json.ok && json.spikes) || []) reasons[s.propertyId] = s.reasonSummary;
+      if (Object.keys(reasons).length) render();
+    } catch { /* banner falls back to the baseline line */ }
+  }
+
+  // ── Spike rule popover ──
+  const ruleBtn = document.getElementById('ruleBtn');
+  const rulePop = document.getElementById('rulePop');
+  const zIn = document.getElementById('ruleZ');
+  const liftIn = document.getElementById('ruleLift');
+  const presetBtns = rulePop ? [...rulePop.querySelectorAll('[data-preset]')] : [];
+  let reasonsTimer = null;
+
+  function syncRuleUi() {
+    if (!ruleBtn) return;
+    zIn.value = rule.z;
+    liftIn.value = rule.lift;
+    const name = Object.keys(PRESETS).find(k => PRESETS[k].z === rule.z && PRESETS[k].lift === rule.lift);
+    presetBtns.forEach(b => {
+      const on = b.dataset.preset === name;
+      b.setAttribute('aria-checked', String(on));
+      b.tabIndex = on || (!name && b === presetBtns[0]) ? 0 : -1;
+    });
+    document.getElementById('ruleSummary').textContent = name ? name[0].toUpperCase() + name.slice(1) : `z ${rule.z}, ${rule.lift}x`;
+  }
+
+  function setRule(next) {
+    rule = clampRule(next);
+    try { localStorage.setItem(RULE_KEY, JSON.stringify(rule)); } catch { /* private mode: keep it for this page only */ }
+    syncRuleUi();
+    for (const k of Object.keys(reasons)) delete reasons[k];
+    render();
+    clearTimeout(reasonsTimer);
+    reasonsTimer = setTimeout(loadSpikeReasons, 400);
+  }
+
+  function openPop(open) {
+    rulePop.classList.toggle('open', open);
+    ruleBtn.setAttribute('aria-expanded', String(open));
+    if (open) (presetBtns.find(b => b.tabIndex === 0) || zIn).focus();
+  }
+
+  if (ruleBtn && rulePop) {
+    syncRuleUi();
+    ruleBtn.addEventListener('click', () => openPop(!rulePop.classList.contains('open')));
+    document.getElementById('ruleClose').addEventListener('click', () => { openPop(false); ruleBtn.focus(); });
+    document.getElementById('ruleReset').addEventListener('click', () => setRule(PRESETS.normal));
+    presetBtns.forEach((b, i) => {
+      b.addEventListener('click', () => { setRule(PRESETS[b.dataset.preset]); b.focus(); });
+      b.addEventListener('keydown', e => {
+        const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        const nb = presetBtns[(i + step + presetBtns.length) % presetBtns.length];
+        setRule(PRESETS[nb.dataset.preset]);
+        nb.focus();
+      });
+    });
+    const onInput = () => {
+      const z = parseFloat(zIn.value), lift = parseFloat(liftIn.value);
+      if (Number.isFinite(z) && Number.isFinite(lift)) setRule({ z, lift });
+    };
+    zIn.addEventListener('change', onInput);
+    liftIn.addEventListener('change', onInput);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && rulePop.classList.contains('open')) { openPop(false); ruleBtn.focus(); }
+    });
+    document.addEventListener('click', e => {
+      if (rulePop.classList.contains('open') && !rulePop.contains(e.target) && !ruleBtn.contains(e.target)) openPop(false);
+    });
+  }
+
+  render();
+  if (typeof QUOTA !== 'undefined') renderQuotaBars(QUOTA);
+  hydrate().then(loadSpikeReasons);
+
+  const cacheAgeEl = document.getElementById('jsCacheAge');
+  if (cacheAgeEl && typeof CACHE_AGE !== 'undefined' && CACHE_AGE) {
+    cacheAgeEl.title = new Date(CACHE_AGE).toLocaleString();
+    cacheAgeEl.textContent = formatRelativeTime(CACHE_AGE);
+  }
+})();
 
 // ── Privacy blur ──────────────────────────────────────────────
 
 const privacyBtn = document.getElementById('privacyBtn');
 if (privacyBtn) {
-  const saved = localStorage.getItem('pb_privacy') === '1';
-  if (saved) { document.body.classList.add('privacy-blur'); privacyBtn.classList.add('is-active'); }
-
-  privacyBtn.addEventListener('click', () => {
-    const on = document.body.classList.toggle('privacy-blur');
-    privacyBtn.classList.toggle('is-active', on);
+  const setPrivacy = on => {
+    document.body.classList.toggle('privacy-blur', on);
+    privacyBtn.setAttribute('aria-pressed', String(on));
     localStorage.setItem('pb_privacy', on ? '1' : '0');
-  });
+  };
+  setPrivacy(localStorage.getItem('pb_privacy') === '1');
+  privacyBtn.addEventListener('click', () => setPrivacy(!document.body.classList.contains('privacy-blur')));
 }
 
 // ── Auto-refresh toggle ───────────────────────────────────────
 
-let countdownTimer = null;
-let countdownSecs  = REFRESH_INTERVAL_MS / 1000;
-
 const toggleEl    = document.getElementById('autoRefreshToggle');
 const countdownEl = document.getElementById('refreshCountdown');
+let countdownTimer = null;
 
 function formatCountdown(secs) {
-  const m = String(Math.floor(secs / 60)).padStart(2, '0');
-  const s = String(secs % 60).padStart(2, '0');
-  return `${m}:${s}`;
-}
-
-function startCountdown() {
-  countdownSecs = REFRESH_INTERVAL_MS / 1000;
-  if (countdownEl) countdownEl.textContent = formatCountdown(countdownSecs);
-  countdownTimer = setInterval(() => {
-    countdownSecs--;
-    if (countdownEl) countdownEl.textContent = formatCountdown(countdownSecs);
-    if (countdownSecs <= 0) { clearInterval(countdownTimer); location.reload(); }
-  }, 1000);
-}
-
-function stopCountdown() {
-  clearInterval(countdownTimer);
-  if (countdownEl) countdownEl.textContent = '';
+  return `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
 }
 
 function setAutoRefresh(on) {
-  if (on) { toggleEl && toggleEl.classList.add('is-on'); startCountdown(); }
-  else    { toggleEl && toggleEl.classList.remove('is-on'); stopCountdown(); }
+  clearInterval(countdownTimer);
+  if (countdownEl) countdownEl.textContent = '';
+  if (toggleEl) toggleEl.setAttribute('aria-pressed', String(on));
   localStorage.setItem('pb_autoRefresh', on ? '1' : '0');
+  if (!on) return;
+  let secs = REFRESH_INTERVAL_MS / 1000;
+  if (countdownEl) countdownEl.textContent = `· reload in ${formatCountdown(secs)}`;
+  countdownTimer = setInterval(() => {
+    secs--;
+    if (countdownEl) countdownEl.textContent = `· reload in ${formatCountdown(secs)}`;
+    if (secs <= 0) { clearInterval(countdownTimer); location.reload(); }
+  }, 1000);
 }
 
 if (toggleEl) {
-  const saved = localStorage.getItem('pb_autoRefresh') === '1';
-  setAutoRefresh(saved);
-  toggleEl.addEventListener('click', () => setAutoRefresh(!toggleEl.classList.contains('is-on')));
+  setAutoRefresh(localStorage.getItem('pb_autoRefresh') === '1');
+  toggleEl.addEventListener('click', () => setAutoRefresh(toggleEl.getAttribute('aria-pressed') !== 'true'));
 }
 
-// ── Reload button spinner ─────────────────────────────────────
+// ── Reload button ─────────────────────────────────────────────
 
-const reloadIcon = document.getElementById('reloadIcon');
-const reloadBtn  = document.getElementById('reloadBtn');
-if (reloadBtn && reloadIcon) {
-  reloadBtn.addEventListener('click', () => reloadIcon.classList.add('spinning'));
+const reloadBtn = document.getElementById('reloadBtn');
+if (reloadBtn) {
+  reloadBtn.addEventListener('click', () => {
+    document.getElementById('reloadIcon')?.classList.add('spinning');
+    location.reload();
+  });
 }
 
 // ── Cache refresh button ──────────────────────────────────────
@@ -597,135 +402,22 @@ if (reloadBtn && reloadIcon) {
 const refreshCacheBtn = document.getElementById('refreshCacheBtn');
 if (refreshCacheBtn) {
   refreshCacheBtn.addEventListener('click', async () => {
-    refreshCacheBtn.textContent = 'Refreshing…';
+    refreshCacheBtn.textContent = 'Refreshing';
     refreshCacheBtn.disabled = true;
     try {
-      const res  = await fetch('/api/refresh-cache', { method: 'POST' });
-      const json = await res.json();
+      const json = await (await fetch('/api/refresh-cache', { method: 'POST' })).json();
       if (json.ok) {
-        refreshCacheBtn.textContent = `✓ ${json.count} properties`;
+        refreshCacheBtn.textContent = `${json.count} properties`;
         setTimeout(() => location.reload(), 800);
-      } else {
-        refreshCacheBtn.textContent = 'Error — retry?';
-        refreshCacheBtn.disabled = false;
+        return;
       }
+      refreshCacheBtn.textContent = 'Error, retry?';
     } catch {
       refreshCacheBtn.textContent = 'Network error';
-      refreshCacheBtn.disabled = false;
     }
+    refreshCacheBtn.disabled = false;
   });
 }
-
-// ── Cache age footer ──────────────────────────────────────────
-
-const cacheAgeEl = document.getElementById('jsCacheAge');
-if (cacheAgeEl && window.CACHE_AGE) {
-  cacheAgeEl.title = formatISO(window.CACHE_AGE);
-  cacheAgeEl.textContent = formatRelativeTime(window.CACHE_AGE);
-}
-
-// ── Favicon error fallback ────────────────────────────────────
-
-document.querySelectorAll('.prop-favicon').forEach(img => {
-  if (img.complete && img.naturalWidth === 0) {
-    img.style.display = 'none';
-    const fb = img.nextElementSibling;
-    if (fb) fb.style.display = 'flex';
-  }
-});
-
-// ── Async Realtime Data Hydration ──────────────────────────────
-
-async function hydrateRealtimeData() {
-  try {
-    const res = await fetch('/api/realtime-all');
-    const json = await res.json();
-    if (!json.ok || !Array.isArray(json.data)) return;
-
-    let totalUsers = 0;
-    let totalViews = 0;
-
-    json.data.forEach(item => {
-      totalUsers += item.activeUsers || 0;
-      totalViews += item.pageViews || 0;
-
-      const card = document.querySelector(`.prop-card[data-pid="${item.propertyId}"]`);
-      if (!card) return;
-
-      card.dataset.active = item.activeUsers || 0;
-      card.dataset.views  = item.pageViews  || 0;
-      if (item.activeUsers > 0) card.classList.add('has-users');
-      if (item.error) card.classList.add('is-error');
-
-      const statNums = card.querySelectorAll('.prop-stat-num');
-      const activeEl = statNums[0];
-      const viewsEl  = statNums[1];
-
-      if (activeEl) {
-        activeEl.dataset.target = item.activeUsers || 0;
-        if (item.activeUsers > 0) activeEl.classList.add('green');
-        countUp(activeEl, item.activeUsers || 0, 600);
-      }
-      if (viewsEl) {
-        viewsEl.dataset.target = item.pageViews || 0;
-        countUp(viewsEl, item.pageViews || 0, 600);
-      }
-    });
-
-    const jsTotal = document.getElementById('jsTotal');
-    const jsTotalViews = document.getElementById('jsTotalViews');
-    if (jsTotal) countUp(jsTotal, totalUsers, 600);
-    if (jsTotalViews) countUp(jsTotalViews, totalViews, 600);
-
-    if (json.quota) {
-      window.QUOTA = json.quota;
-      renderQuotaBars(json.quota);
-    }
-  } catch { /* silent */ }
-}
-
-// ── Traffic Spike HUD Hydration ──────────────────────────────
-
-async function fetchTrafficSpikes() {
-  try {
-    const res = await fetch('/api/spikes');
-    const json = await res.json();
-
-    document.querySelectorAll('.prop-alert').forEach(el => el.remove());
-
-    if (!json.ok || !json.spikes || json.spikes.length === 0) {
-      return;
-    }
-
-    json.spikes.forEach(s => {
-      const card = document.querySelector(`.prop-card[data-pid="${s.propertyId}"]`);
-      if (!card) return;
-      const alert = document.createElement('button');
-      alert.className = 'prop-alert';
-      alert.type = 'button';
-      alert.innerHTML = `
-        <span class="prop-alert-title">${Number(s.activeUsers || 0).toLocaleString()} active · ${escHtmlMain(s.spikeMultiplier)}x usual peak</span>
-        <span class="prop-alert-copy" data-privacy>${escHtmlMain(s.reasonSummary)}</span>
-      `;
-      alert.addEventListener('click', (event) => {
-        event.stopPropagation();
-        openCardModal(card.dataset.pid);
-      });
-      const stats = card.querySelector('.prop-stats');
-      if (stats) stats.insertAdjacentElement('afterend', alert);
-    });
-  } catch { /* silent */ }
-}
-
-// ── Init ──────────────────────────────────────────────────────
-
-window.addEventListener('load', () => {
-  revealCards();
-  animateStatNumbers();
-  buildQuotaBars();
-  hydrateRealtimeData();
-  fetchTrafficSpikes();
-});
 
 // ── Toast notification system ──────────────────────────────────
 
@@ -738,37 +430,31 @@ function showToast(msg) {
     document.body.appendChild(container);
   }
   const el = document.createElement('div');
-  el.style.cssText = 'background:var(--card-bg,#fff);border:1px solid var(--card-bdr,#cccfd3);border-radius:var(--radius,2px);padding:10px 14px;font-size:12px;font-weight:600;color:var(--text,#3a3d43);box-shadow:rgba(111,123,144,0.1) 0 -2px 0 0 inset;display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(8px);transition:opacity 250ms cubic-bezier(0.215,0.61,0.355,1),transform 250ms cubic-bezier(0.215,0.61,0.355,1)';
+  el.style.cssText = 'background:var(--surface,#fff);color:var(--text,#18181b);border:1px solid var(--border-2,#dcdce3);border-radius:3px;padding:10px 14px;font-size:12px;font-weight:500;box-shadow:var(--pop-shadow,0 8px 24px -6px rgba(0,0,0,.18));opacity:0;transform:translateY(8px);transition:opacity 180ms ease-out,transform 180ms ease-out';
   el.textContent = msg;
   container.appendChild(el);
   requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
   setTimeout(() => {
     el.style.opacity = '0'; el.style.transform = 'translateY(8px)';
-    setTimeout(() => el.remove(), 300);
+    setTimeout(() => el.remove(), 200);
   }, 2800);
 }
 
 // ── Keyboard shortcuts (dashboard) ─────────────────────────────
 
 document.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
 
   switch (e.key.toLowerCase()) {
     case 'r':
-      e.preventDefault();
-      const reloadBtn = document.getElementById('reloadBtn');
-      if (reloadBtn) { reloadBtn.click(); showToast('Reloading…'); }
+      if (reloadBtn) { e.preventDefault(); showToast('Reloading'); reloadBtn.click(); }
       break;
     case 'p':
-      e.preventDefault();
-      const privBtn = document.getElementById('privacyBtn');
-      if (privBtn) privBtn.click();
+      if (privacyBtn) { e.preventDefault(); privacyBtn.click(); }
       break;
     case 'a':
-      e.preventDefault();
-      const toggleEl2 = document.getElementById('autoRefreshToggle');
-      if (toggleEl2) toggleEl2.click();
+      if (toggleEl) { e.preventDefault(); toggleEl.click(); }
       break;
     case 'g':
       e.preventDefault();
@@ -776,17 +462,8 @@ document.addEventListener('keydown', (e) => {
       break;
     case '?':
       e.preventDefault();
-      showToast('R Reload · P Privacy · A Auto-refresh · G Globe · 1-3 Sort');
+      showToast('R Reload · P Privacy · A Auto-refresh · G Globe');
       break;
   }
 });
-
-// ── Sort via number keys ───────────────────────────────────────
-
-document.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.key === '1') sortCards('active');
-  if (e.key === '2') sortCards('views');
-  if (e.key === '3') sortCards('name');
-});
+})();

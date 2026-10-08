@@ -15,6 +15,7 @@
         --a-serif: 'Plex Serif', Georgia, serif;
         --a-sans: 'Inter', system-ui, sans-serif;
         --a-radius: 2px;
+        --a-warn: #b45309;
         /* ── Animation tokens ── */
         --a-ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
         --a-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
@@ -29,6 +30,7 @@
         --a-text: #e4e2dd;
         --a-muted: #8a8890;
         --a-xmuted: #5a5870;
+        --a-warn: #fbbf24;
     }
 
     *,
@@ -402,6 +404,181 @@
         font-size: 10px;
         color: var(--a-xmuted);
         white-space: nowrap;
+    }
+
+    /* Report extras: engagement tables, referrers, bots, revenue */
+    .an-card-body .num {
+        font-variant-numeric: tabular-nums
+    }
+
+    .ex-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 56px 52px 48px 40px;
+        gap: 8px;
+        align-items: baseline;
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(128, 128, 128, 0.07);
+        font-size: 11px;
+    }
+
+    .ex-row-2 {
+        grid-template-columns: minmax(0, 1fr) 56px 72px
+    }
+
+    .ex-head {
+        font-size: 10px;
+        color: var(--a-xmuted);
+        padding-top: 0
+    }
+
+    .ex-head span,
+    .ex-n {
+        text-align: right
+    }
+
+    .ex-head span:first-child {
+        text-align: left
+    }
+
+    .ex-label {
+        min-width: 0;
+        color: var(--a-text);
+        overflow-wrap: break-word;
+        word-break: normal
+    }
+
+    .ex-group-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0
+    }
+
+    .ex-group-name svg {
+        display: inline-block;
+        flex-shrink: 0
+    }
+
+    a.ex-url {
+        color: var(--a-text);
+        text-decoration: none
+    }
+
+    a.ex-url:hover {
+        color: var(--a-accent);
+        text-decoration: underline
+    }
+
+    .ex-sub {
+        display: block;
+        font-size: 10px;
+        color: var(--a-xmuted);
+        margin-top: 2px
+    }
+
+    .ex-flag {
+        color: var(--a-warn)
+    }
+
+    .ex-n {
+        color: var(--a-muted);
+        white-space: nowrap
+    }
+
+    .ex-group {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 0 4px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--a-text)
+    }
+
+    .ex-group-n {
+        font-weight: 400;
+        color: var(--a-xmuted);
+        font-size: 10px
+    }
+
+    .ex-seg {
+        display: inline-flex;
+        padding: 2px;
+        gap: 2px;
+        margin-bottom: 8px;
+        background: var(--a-bdr);
+        border-radius: 2px
+    }
+
+    .ex-seg button {
+        height: 26px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 2px;
+        background: transparent;
+        color: var(--a-muted);
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+        transition: background-color 150ms ease, color 150ms ease
+    }
+
+    .ex-seg button[aria-pressed="true"] {
+        background: var(--a-card);
+        color: var(--a-text)
+    }
+
+    .ex-tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 8px;
+        margin-bottom: 12px
+    }
+
+    .ex-tile {
+        display: grid;
+        gap: 2px;
+        padding: 8px 10px;
+        background: var(--a-bg);
+        border-radius: 2px
+    }
+
+    .ex-tile-k {
+        font-size: 10px;
+        color: var(--a-xmuted)
+    }
+
+    .ex-tile-v {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--a-text)
+    }
+
+    @media (pointer: coarse) {
+        .ex-seg button {
+            height: 40px
+        }
+    }
+
+    @media (max-width: 480px) {
+        .ex-row {
+            grid-template-columns: minmax(0, 1fr) 52px 52px 48px 40px;
+            gap: 2px 6px
+        }
+
+        .ex-row > .ex-label,
+        .ex-head > span:first-child {
+            grid-column: 1 / -1
+        }
+
+        .ex-head > span:first-child:empty {
+            display: none
+        }
+
+        .ex-row-2 {
+            grid-template-columns: minmax(0, 1fr) 56px 72px
+        }
     }
 
     /* Trend chart */
@@ -1782,9 +1959,9 @@
         const step = Math.max(1, Math.floor(n / 6));
         const xLbls = rows.map((r, i) => {
             if (i !== 0 && i !== n - 1 && i % step !== 0) return '';
-            const d = r.dims[0]; // YYYYMMDD
+            const d = r.dims[0]; // YYYYMMDD or YYYYMMDDHH
             return '<text x="' + px(i) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="9" fill="currentColor" fill-opacity=".4">' +
-                d.slice(4, 6) + '/' + d.slice(6, 8) + '</text>';
+                d.slice(4, 6) + '/' + d.slice(6, 8) + (d.length === 10 ? ' ' + d.slice(8, 10) + 'h' : '') + '</text>';
         }).join('');
 
         // Gradient + area + polyline for the active series only
@@ -1800,7 +1977,7 @@
         // Invisible hover targets — tooltip still shows every metric for that date
         const hover = rows.map((r, i) => {
             const d = r.dims[0];
-            const date = d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8);
+            const date = d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8) + (d.length === 10 ? ' ' + d.slice(8, 10) + ':00' : '');
             const tip = date + '  ·  ' + metricHeaders.map((h, mi) =>
                 metricLabel(h) + ': ' + (isRevenueMetric(h) ? fmt(r.metrics[mi] || 0, true, currencyCode) : fmt(r.metrics[mi] || 0))).join('  ·  ');
             return '<circle cx="' + px(i) + '" cy="' + py(activeVals[i]) + '" r="16" fill="transparent"' +
@@ -1860,7 +2037,115 @@
         }).join('');
     }
 
+    /* ─── Report extras: engagement tables, referrers, bots, revenue ─── */
+    function fmtDur(sec) {
+        const s = Math.round(+sec || 0);
+        return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }
+
+    function fmtPct(p) {
+        return (Math.round((+p || 0) * 10) / 10) + '%';
+    }
+
+    function safeHref(url) {
+        try {
+            const u = new URL(url);
+            return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '';
+        } catch { return ''; }
+    }
+
+    const ENG_HEAD = '<div class="ex-row ex-head" aria-hidden="true"><span></span>' +
+        '<span>Sessions</span><span>Engaged</span><span>Avg time</span><span>Key ev.</span></div>';
+
+    function engCells(m) {
+        return '<span class="ex-n num">' + fmt(m[0]) + '</span>' +
+            '<span class="ex-n num">' + fmtPct(m[1]) + '</span>' +
+            '<span class="ex-n num">' + fmtDur(m[2]) + '</span>' +
+            '<span class="ex-n num">' + fmt(m[3]) + '</span>';
+    }
+
+    const SEG_LABELS = { source: 'Source', medium: 'Medium', platform: 'Platform' };
+
+    function renderEngagement(data) {
+        const seg = data.segments ? '<div class="ex-seg" role="group" aria-label="Split by">' +
+            data.segments.map(s => '<button type="button" aria-pressed="' + (s === data.seg) + '" onclick="setCardSeg(\'' + data.type + '\', \'' + s + '\')">' +
+                (SEG_LABELS[s] || s) + '</button>').join('') + '</div>' : '';
+        if (!data.rows || !data.rows.length) return seg + '<div class="an-empty">No data for this period.</div>';
+        return seg + ENG_HEAD + data.rows.map(r =>
+            '<div class="ex-row"><span class="ex-label" title="' + escHtml(r.dims.join(' / ')) + '">' + escHtml(r.dims.join(' / ')) + '</span>' +
+            engCells(r.metrics) + '</div>').join('');
+    }
+
+    function renderReferrers(data) {
+        const groups = data.groups || [];
+        if (!groups.length) return '<div class="an-empty">No external referrers in this range.</div>';
+        return ENG_HEAD + groups.map(g =>
+            '<div class="ex-group"><span class="ex-group-name">' + shapeIcon(g.shape, 12) + ' ' + escHtml(g.name) + '</span>' +
+            '<span class="ex-group-n num">' + fmt(g.sessions) + ' sessions</span></div>' +
+            g.rows.map(r => {
+                const m = [r.sessions, r.engagementRate * 100, r.avgEngagement, r.keyEvents ?? 0];
+                const shown = String(r.url).replace(/^https?:\/\//, '');
+                const href = safeHref(r.url);
+                const label = href
+                    ? '<a class="ex-label ex-url" href="' + escHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escHtml(shown) + '</a>'
+                    : '<span class="ex-label ex-url">' + escHtml(shown) + '</span>';
+                return '<div class="ex-row">' + label + engCells(m) + '</div>';
+            }).join('')).join('');
+    }
+
+    function renderBots(data) {
+        const rows = data.flagged || [];
+        if (!rows.length) return '<div class="an-empty">No bot-like traffic in this range.</div>';
+        return '<div class="ex-row ex-row-2 ex-head" aria-hidden="true"><span></span><span>Sessions</span><span>Share</span></div>' +
+            rows.map(r =>
+                '<div class="ex-row ex-row-2"><span class="ex-label">' + escHtml(r.country + ' · ' + r.city) +
+                '<span class="ex-sub">' + escHtml(r.source + ' · ' + r.device) + ' · <span class="ex-flag">' + escHtml(r.reason) + '</span></span></span>' +
+                '<span class="ex-n num">' + fmt(r.sessions) + '</span>' +
+                '<span class="ex-n num">' + fmtPct(r.share * 100) + '</span></div>').join('');
+    }
+
+    const REVENUE_TILES = [
+        ['totalAdRevenue', 'Ad revenue', true],
+        ['purchaseRevenue', 'Purchase revenue', true],
+        ['eventValue', 'Event value', true],
+        ['publisherAdImpressions', 'Ad impressions', false],
+        ['publisherAdClicks', 'Ad clicks', false],
+        ['keyEvents', 'Key events', false],
+    ];
+
+    function renderRevenue(data) {
+        const s = data.summary || {};
+        const tiles = REVENUE_TILES.filter(([k]) => (s[k] || 0) !== 0).map(([k, label, cur]) =>
+            '<div class="ex-tile"><span class="ex-tile-k">' + label + '</span><span class="ex-tile-v num">' +
+            escHtml(cur ? fmt(s[k], true, data.currencyCode) : fmt(s[k])) + '</span></div>').join('');
+        const events = (data.events || []).length
+            ? '<div class="ex-row ex-row-2 ex-head" aria-hidden="true"><span>Key event</span><span>Count</span><span>Value</span></div>' +
+              data.events.map(e => '<div class="ex-row ex-row-2"><span class="ex-label">' + escHtml(e.name) + '</span>' +
+                '<span class="ex-n num">' + fmt(e.keyEvents) + '</span>' +
+                '<span class="ex-n num">' + escHtml(fmt(e.value, true, data.currencyCode)) + '</span></div>').join('')
+            : '';
+        return '<div class="ex-tiles">' + tiles + '</div>' + events;
+    }
+
+    function setCardSeg(type, seg) {
+        const el = document.getElementById('body-' + type);
+        if (!el || !currentPropId) return;
+        el.innerHTML = skeleton();
+        fetch('/api/analytics-card/' + currentPropId + '/' + type + '?range=' + currentRange + '&seg=' + encodeURIComponent(seg))
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { el.innerHTML = '<div class="an-error">' + escHtml(data.error) + '</div>'; return; }
+                cardDataStore[type] = data;
+                el.innerHTML = renderCardBody(data);
+            })
+            .catch(() => { el.innerHTML = '<div class="an-error">Network error</div>'; });
+    }
+
     function renderCardBody(data) {
+        if (data.kind === 'engagement') return renderEngagement(data);
+        if (data.kind === 'referrers') return renderReferrers(data);
+        if (data.kind === 'bots') return renderBots(data);
+        if (data.kind === 'revenue') return renderRevenue(data);
         if (data.timeSeries) {
             return renderTrendChart(data);
         }
@@ -1917,6 +2202,11 @@
                     if (!el) return;
                     if (data.error) { el.innerHTML = '<div class="an-error">&#9888; ' + escHtml(data.error) + '</div>'; return; }
                     if (data.currencyCode) currentCurrencyCode = data.currencyCode;
+                    if (data.kind === 'revenue' && data.hidden) {
+                        const card = document.getElementById('card-' + c.type);
+                        if (card) card.remove();
+                        return;
+                    }
                     // Store data for CSV export
                     cardDataStore[c.type] = data;
                     el.innerHTML = renderCardBody(data);
