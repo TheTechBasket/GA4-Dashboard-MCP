@@ -66,7 +66,7 @@ function getLatestQuota() {
 
 /**
  * Valid Realtime Dimensions in GA4:
- * country, countryId, city, deviceCategory, eventName, unifiedScreenName, streamName, platform
+ * country, countryId, city, deviceCategory, eventName, unifiedScreenName, streamName, platform, minutesAgo
  */
 const VALID_REALTIME_DIMENSIONS = new Set([
   "country",
@@ -79,6 +79,7 @@ const VALID_REALTIME_DIMENSIONS = new Set([
   "platform",
   "operatingSystem",
   "browser",
+  "minutesAgo",
 ]);
 
 /**

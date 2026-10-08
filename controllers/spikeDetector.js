@@ -79,13 +79,12 @@ async function detectAllSpikes(properties) {
   const results = await Promise.all(
     properties.map(async (prop) => {
       try {
-        // 1. Fetch Realtime Active Users & Screen Pages
+        // 1. Realtime active users, per stream. Summing per-page rows counted
+        // a user once per page viewed, roughly doubling the total.
         const rtRes = await runSafeRealtimeReport({
           propertyId: prop.id,
-          dimensions: [{ name: "unifiedScreenName" }],
-          metrics: [{ name: "activeUsers" }, { name: "screenPageViews" }],
+          metrics: [{ name: "activeUsers" }],
           minuteRanges: [{ startMinutesAgo: 29, endMinutesAgo: 0 }],
-          limit: 10,
         });
 
         if (!rtRes.ok) return null;
@@ -137,7 +136,14 @@ async function detectAllSpikes(properties) {
           .filter((r) => r.users > 0)
           .sort((a, b) => b.users - a.users);
 
-        const topPage = rtRes.rows?.[0]?.dimensionValues?.[0]?.value || "/";
+        const pageRes = await runSafeRealtimeReport({
+          propertyId: prop.id,
+          dimensions: [{ name: "unifiedScreenName" }],
+          metrics: [{ name: "activeUsers" }],
+          minuteRanges: [{ startMinutesAgo: 29, endMinutesAgo: 0 }],
+          limit: 1,
+        });
+        const topPage = pageRes.rows?.[0]?.dimensionValues?.[0]?.value || "/";
 
         // Heuristic Explanation Generation
         const primaryRef = topReferrals[0];
