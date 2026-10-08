@@ -111,7 +111,7 @@ const CARD_CATALOG = [
     group: "Audience",
     wide: true,
     chartCard: true,
-    sub: "New users, sessions, revenue — click a legend item to switch",
+    sub: "New users, sessions, revenue. Click a legend item to switch",
     color: "#059669",
     bg: "rgba(5, 150, 105, 0.1)",
     icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',

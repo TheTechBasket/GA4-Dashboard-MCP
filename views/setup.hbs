@@ -98,10 +98,10 @@
       <span class="setup-step-num">6</span>
       <div class="setup-step-body">
         <strong>Optional: the MCP server</strong>
-        <p>This project also ships a standalone GA4 MCP server in <code>mcp-server/</code> for use with Claude/other MCP clients — it's separate from the dashboard above and needs its own credentials. It does <em>not</em> read a JSON key file directly: set <code>GOOGLE_APPLICATION_CREDENTIALS</code> (path to a key, e.g. the same <code>ga4dataapi-*.json</code> from step 4) or <code>GA_SERVICE_ACCOUNT_JSON</code> (the key inline) as an env var, then <code>cd mcp-server &amp;&amp; npm install</code>. See <code>mcp-server/README.md</code> for the full setup. Skip this step if you only want the web dashboard.</p>
+        <p>This project also ships a standalone GA4 MCP server in <code>mcp-server/</code> for use with Claude/other MCP clients. It's separate from the dashboard above and needs its own credentials. It does <em>not</em> read a JSON key file directly: set <code>GOOGLE_APPLICATION_CREDENTIALS</code> (path to a key, e.g. the same <code>ga4dataapi-*.json</code> from step 4) or <code>GA_SERVICE_ACCOUNT_JSON</code> (the key inline) as an env var, then <code>cd mcp-server &amp;&amp; npm install</code>. See <code>mcp-server/README.md</code> for the full setup. Skip this step if you only want the web dashboard.</p>
       </div>
     </li>
   </ol>
 
-  <p class="setup-foot">Key files matching <code>ga4dataapi-*.json</code> in the project root are already git-ignored — safe to drop in directly.</p>
+  <p class="setup-foot">Key files matching <code>ga4dataapi-*.json</code> in the project root are already git-ignored, so it is safe to drop them in directly.</p>
 </div>

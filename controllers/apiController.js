@@ -1267,7 +1267,7 @@ exports.analyticsReports = async (req, res) => {
                     category: s.category,
                     sessions: s.sessions,
                     users: s.users,
-                    annotation: `Traffic from ${s.classifiedName} — ${s.sessions} sessions, ${s.users} users`,
+                    annotation: `Traffic from ${s.classifiedName}: ${s.sessions} sessions, ${s.users} users`,
                     landingPages: srcLandingPages,
                     referrers: matchingReferrers,
                     searchUrl,
