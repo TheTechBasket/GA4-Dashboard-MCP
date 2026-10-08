@@ -941,6 +941,7 @@ exports.analyticsCard = async (req, res) => {
             dateRange,
             limit,
             orderBys,
+            metricAggregations: ["TOTAL"],
         });
 
         if (!response.ok) throw new Error(response.error || "Report query failed");
@@ -952,10 +953,14 @@ exports.analyticsCard = async (req, res) => {
             metrics: row.metricValues.map(m => parseFloat(m.value || "0")),
         }));
 
-        const totals = rows.reduce((acc, r) => {
-            r.metrics.forEach((v, i) => { acc[i] = (acc[i] || 0) + v; });
-            return acc;
-        }, []);
+        // GA4's own totals cover every row, not only the top `limit`; row sum is the fallback.
+        const gaTotals = response.totals?.[0]?.metricValues;
+        const totals = gaTotals
+            ? gaTotals.map(m => parseFloat(m.value || "0"))
+            : rows.reduce((acc, r) => {
+                r.metrics.forEach((v, i) => { acc[i] = (acc[i] || 0) + v; });
+                return acc;
+            }, []);
 
         const payload = {
             ok: true, type, rows, totals, range,

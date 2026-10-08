@@ -218,7 +218,11 @@ if (document.getElementById('quotaMeters')) {
 
     const banner = document.getElementById('spikeBanner');
     banner.hidden = !m.spikes.length;
-    banner.innerHTML = m.spikes.map(spikeBanner).join('');
+    // Top 2 get a full banner; the rest are named in one line (their cards still show the spike).
+    const more = m.spikes.slice(2);
+    banner.innerHTML = m.spikes.slice(0, 2).map(spikeBanner).join('') + (more.length
+      ? `<p class="spike-more">${more.length} more spiking: <span data-privacy>${more.map(p => escHtmlMain(p.siteName)).join(', ')}</span></p>`
+      : '');
 
     const grid = document.getElementById('propGrid');
     grid.innerHTML = m.live.length

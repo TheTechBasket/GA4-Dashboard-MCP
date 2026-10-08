@@ -80,6 +80,16 @@ describe("spike detector baseline", () => {
     await propertyBaseline(prop, { ...deps, now: new Date("2026-10-10T04:11:00Z") });
     expect(calls).to.equal(2);
   });
+
+  it("propertyBaseline retries a failed timezone lookup without refetching history", async () => {
+    const { propertyBaseline } = require("../controllers/spikeDetector");
+    let tz = null;
+    const deps = { fetchHistory: async () => [row("2026100903", 10)], timeZone: async () => tz, now: new Date("2026-10-10T03:10:00Z") };
+    const prop = { id: "test-tz-retry" };
+    expect((await propertyBaseline(prop, deps)).kind).to.equal("peak");
+    tz = "UTC";
+    expect((await propertyBaseline(prop, deps)).kind).to.equal("same-hour");
+  });
 });
 
 describe("scoreSpike", () => {

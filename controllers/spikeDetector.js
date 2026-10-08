@@ -132,8 +132,12 @@ function parseSpikeOpts(query = {}) {
 }
 
 const tzCache = new Map();
-async function propertyTimeZone(propertyId) {
-  if (tzCache.has(propertyId)) return tzCache.get(propertyId);
+// A failed lookup is retried after 10 minutes instead of sticking until restart.
+const TZ_RETRY_MS = 10 * 60 * 1000;
+
+async function propertyTimeZone(propertyId, now = Date.now()) {
+  const hit = tzCache.get(propertyId);
+  if (hit && (hit.tz || now - hit.at < TZ_RETRY_MS)) return hit.tz;
   let tz = null;
   try {
     const [p] = await getGA4AdminClient().getProperty({ name: `properties/${propertyId}` });
@@ -141,7 +145,7 @@ async function propertyTimeZone(propertyId) {
   } catch (err) {
     console.warn(`[spikeDetector] timezone lookup failed for ${propertyId}: ${err.message}`);
   }
-  tzCache.set(propertyId, tz);
+  tzCache.set(propertyId, { tz, at: now });
   return tz;
 }
 
@@ -178,6 +182,8 @@ async function propertyBaseline(prop, deps = {}) {
     if (!rows) return null;
     hit = { at: now.getTime(), rows, tz };
     historyCache.set(prop.id, hit);
+  } else if (!hit.tz) {
+    hit.tz = await timeZone(prop.id);
   }
   const same = hit.tz ? sameHourBaseline(hit.rows, hourIn(hit.tz, now)) : null;
   if (same) return { baseline: same.baseline, sd: same.sd, kind: "same-hour", dod: same.dod, wow: same.wow };
