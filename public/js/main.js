@@ -1,5 +1,5 @@
 /* ──────────────────────────────────────────────────────────────
-   Pulseboard — main.js
+   GA4 Dashboard & MCP: main.js
    Handles: card reveal animations, count-up, quota bars,
             auto-refresh toggle, cache refresh, sort, card expand,
             privacy blur, quota live-polling, keyboard shortcuts,
@@ -704,7 +704,7 @@ async function fetchTrafficSpikes() {
       alert.className = 'prop-alert';
       alert.type = 'button';
       alert.innerHTML = `
-        <span class="prop-alert-title">${Number(s.activeUsers || 0).toLocaleString()} active · ${escHtmlMain(s.spikeMultiplier)}x normal</span>
+        <span class="prop-alert-title">${Number(s.activeUsers || 0).toLocaleString()} active · ${escHtmlMain(s.spikeMultiplier)}x usual peak</span>
         <span class="prop-alert-copy" data-privacy>${escHtmlMain(s.reasonSummary)}</span>
       `;
       alert.addEventListener('click', (event) => {

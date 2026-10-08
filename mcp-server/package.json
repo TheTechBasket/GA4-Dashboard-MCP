@@ -2,6 +2,9 @@
   "name": "ga4-mcp-server",
   "version": "0.1.0",
   "description": "MCP server exposing Google Analytics Admin + Data API tools (account info, reports, funnels, realtime) with built-in caching and rate-limit throttling.",
+  "engines": {
+    "node": ">=24"
+  },
   "main": "index.js",
   "bin": {
     "ga4-mcp-server": "index.js"

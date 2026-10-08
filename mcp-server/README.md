@@ -2,7 +2,7 @@
 
 Standalone MCP server exposing Google Analytics Admin + Data API tools. Lives
 in its own folder with its own `package.json` — installing/running it never
-touches the root Pulseboard app's dependencies or runtime.
+touches the root GA4 Dashboard & MCP app's dependencies or runtime.
 
 ## Setup
 

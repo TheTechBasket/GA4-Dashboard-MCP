@@ -55,6 +55,22 @@ function classifyReferralSource(sourceStr) {
 }
 
 /**
+ * Average over days of each day's busiest hour, halved to match the 30-minute realtime window.
+ * ponytail: peak-hour baseline, so off-peak surges below the usual peak are missed; compare same hour-of-day (needs property timezone) if that matters.
+ */
+function peakHalfHourBaseline(rows) {
+  const peakByDay = {};
+  for (const r of rows || []) {
+    const day = (r.dimensionValues?.[0]?.value || "").slice(0, 8);
+    const users = parseInt(r.metricValues?.[0]?.value || "0", 10);
+    peakByDay[day] = Math.max(peakByDay[day] || 0, users);
+  }
+  const peaks = Object.values(peakByDay);
+  if (peaks.length === 0) return 1;
+  return Math.max(1, Math.round(peaks.reduce((a, b) => a + b, 0) / peaks.length / 2));
+}
+
+/**
  * Detects traffic spikes across all available properties
  */
 async function detectAllSpikes(properties) {
@@ -79,27 +95,19 @@ async function detectAllSpikes(properties) {
           0
         );
 
-        // 2. Fetch Historical 7-day average baseline (active users per 30m window)
+        // 2. Baseline: the usual busiest half hour over the last 7 days.
+        // Daily users / 48 assumed flat traffic, so every normal peak hour read as a spike.
         const histRes = await runSafeHistoricalReport({
           propertyId: prop.id,
-          dimensions: [{ name: "date" }],
+          dimensions: [{ name: "dateHour" }],
           metrics: [{ name: "activeUsers" }],
           dateRange: { startDate: "7daysAgo", endDate: "yesterday" },
-          limit: 7,
+          limit: 7 * 24,
         });
 
-        let avgBaseline = 1;
-        if (histRes.ok && histRes.rows.length > 0) {
-          const sum7d = histRes.rows.reduce(
-            (s, r) => s + parseInt(r.metricValues?.[0]?.value || "0", 10),
-            0
-          );
-          // Average active users per 30-min window over 7 days (48 windows per day)
-          avgBaseline = Math.max(1, Math.round(sum7d / (histRes.rows.length * 48)));
-        }
-
+        const avgBaseline = histRes.ok ? peakHalfHourBaseline(histRes.rows) : 1;
         const spikeRatio = totalActive / avgBaseline;
-        const isSpike = (totalActive >= 4 && spikeRatio >= 1.7) || totalActive >= 12;
+        const isSpike = totalActive >= 4 && spikeRatio >= 1.7;
 
         if (!isSpike) return null;
 
@@ -169,4 +177,5 @@ async function detectAllSpikes(properties) {
 module.exports = {
   classifyReferralSource,
   detectAllSpikes,
+  peakHalfHourBaseline,
 };

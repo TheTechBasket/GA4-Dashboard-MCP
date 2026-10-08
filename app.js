@@ -118,7 +118,7 @@ app.use("/", apiroutes);
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
 	const serverUrl = `http://localhost:${port}`;
-	console.log(`\n🚀 GA4 Pulseboard server running!`);
+	console.log(`\n🚀 GA4 Dashboard & MCP server running!`);
 	console.log(`   ➜ Local Dashboard: ${serverUrl}`);
 	console.log(`   ➜ 3D Globe View:   ${serverUrl}/globe`);
 	console.log(`   ➜ Analytics View:  ${serverUrl}/analytics\n`);
