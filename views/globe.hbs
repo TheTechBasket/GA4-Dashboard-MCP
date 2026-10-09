@@ -1,11 +1,11 @@
 <link rel="stylesheet" href="/css/panel.css" />
 <style>
   /* Map-only tokens (DESIGN.md exception, like the dither fill). Plain values, not light-dark(): the canvas engine reads them with getComputedStyle. */
-  :root { --sea: #e4e5ec; --land: #ffffff; --landline: #d4d4dc; --grat: rgba(24,24,27,.05); --space: #f7f7f9; --halo: rgba(79,70,229,.16); --indline: #a8a8b4; --night: rgba(30,32,64,.07); }
-  :root[data-theme="dark"] { --sea: #0f0f13; --land: #1d1d23; --landline: #33333c; --grat: rgba(255,255,255,.04); --space: #060608; --halo: rgba(129,140,248,.22); --indline: #5a5a66; --night: rgba(0,0,0,.2); }
-  :root[data-map="outdoors"] { --sea: #4a9fd8; --land: #9cd08a; --landline: #6f9f5f; --grat: rgba(30,80,110,.08); --space: #eef4f7; --halo: rgba(70,150,200,.35); --indline: #7d7488; --night: rgba(8,12,32,.14); }
-  :root[data-theme="dark"][data-map="outdoors"] { --sea: #0b3a5e; --land: #24502f; --landline: #3a6d47; --grat: rgba(160,210,240,.05); --space: #04080b; --halo: rgba(90,170,230,.25); --indline: #7d7488; --night: rgba(0,0,0,.2); }
-  /* --night: one of 4 stacked night circles (day/night shade), so the core is about 4x this alpha */
+  :root { --sea: #e4e5ec; --land: #ffffff; --landline: #d4d4dc; --grat: rgba(24,24,27,.05); --space: #f7f7f9; --halo: rgba(79,70,229,.16); --indline: #a8a8b4; --night: rgba(30,32,64,.28); }
+  :root[data-theme="dark"] { --sea: #0f0f13; --land: #1d1d23; --landline: #33333c; --grat: rgba(255,255,255,.04); --space: #060608; --halo: rgba(129,140,248,.22); --indline: #5a5a66; --night: rgba(0,0,6,.75); }
+  :root[data-map="outdoors"] { --sea: #4a9fd8; --land: #9cd08a; --landline: #6f9f5f; --grat: rgba(30,80,110,.08); --space: #eef4f7; --halo: rgba(70,150,200,.35); --indline: #7d7488; --night: rgba(8,12,32,.45); }
+  :root[data-theme="dark"][data-map="outdoors"] { --sea: #0b3a5e; --land: #24502f; --landline: #3a6d47; --grat: rgba(160,210,240,.05); --space: #04080b; --halo: rgba(90,170,230,.25); --indline: #7d7488; --night: rgba(0,0,6,.75); }
+  /* --night: core color of the night side; drawn as 16 stacked circles whose combined alpha is this alpha, for a smooth dusk ramp */
 
   /* Vivid looks (MapLibre globe, Outdoors): dark space backdrop and a stronger blue halo in both themes */
   :root[data-gspace="dark"] { --space: #05070d; --halo: rgba(74,159,216,.55); }

@@ -175,9 +175,15 @@ function placeMarks() {
   if (!card.hidden) positionCard();
 }
 
-/* ── Day and night (variant A): 4 stacked circles around the anti-solar point, each filled with the map-only
-   --night token, so dusk reads as a gradient. Sun math in sun.js; recomputed every 60 s (tickNight). ── */
-const NIGHT_R = [90, 84, 78, 72];
+/* ── Day and night (variant A): 16 stacked circles around the anti-solar point (radius 90 to 72 deg), each at
+   1/16 of the map-only --night token, so dusk is a smooth ramp with no visible bands and the core is about --night.
+   Sun math in sun.js; recomputed every 60 s (tickNight). ── */
+const NIGHT_N = 16, NIGHT_R = Array.from({ length: NIGHT_N }, (_, i) => 90 - i * 18 / (NIGHT_N - 1));
+/* --night rgba to an opaque color plus the per-circle opacity whose 16-fold stack equals the token alpha */
+function nightPaint() {
+  const [r, g, b, a = 1] = (css("--night").match(/[\d.]+/g) || [0, 0, 0, 0.3]).map(Number);
+  return { color: `rgb(${r},${g},${b})`, opacity: 1 - (1 - a) ** (1 / NIGHT_N) };
+}
 /* A spherical polygon as flat lng/lat rings. d3's equirectangular stream cuts it at the antimeridian and walks the
    pole edge when it covers a pole; a plain lng/lat ring cannot say that, and MapLibre reads GeoJSON as flat. */
 const PLATE = d3.geoEquirectangular().scale(180 / Math.PI).translate([0, 0]).precision(0);
@@ -251,7 +257,7 @@ function canvasEngine() {
       ctx.beginPath(); path({ type: "Sphere" }); ctx.fillStyle = css("--sea"); ctx.fill();
       ctx.beginPath(); path(graticule); ctx.strokeStyle = css("--grat"); ctx.lineWidth = 1; ctx.stroke();
       ctx.beginPath(); path(world.land); ctx.fillStyle = css("--land"); ctx.fill();
-      if (state.night) { ctx.fillStyle = css("--night"); for (const c of night.circles) { ctx.beginPath(); path(c); ctx.fill(); } } /* above land, under the India borders */
+      if (state.night) { const np = nightPaint(); ctx.fillStyle = np.color; ctx.globalAlpha = np.opacity; for (const c of night.circles) { ctx.beginPath(); path(c); ctx.fill(); } ctx.globalAlpha = 1; } /* above land, under the India borders */
       ctx.beginPath(); path(world.borders); ctx.strokeStyle = css("--landline"); ctx.lineWidth = 0.6; ctx.stroke();
       if (globe) { /* sphere shading: light from top left, darker limb */
         const g = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.45, r * 0.05, cx, cy, r);
@@ -348,7 +354,7 @@ function mlEngine() {
     const before = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
     NIGHT_R.forEach((_, i) => {
       if (!map.getLayer(`night-${i}`)) map.addLayer({ id: `night-${i}`, type: "fill", source: "night", filter: ["==", ["get", "i"], i],
-        layout: { visibility: state.night ? "visible" : "none" }, paint: { "fill-color": css("--night"), "fill-antialias": false } }, before);
+        layout: { visibility: state.night ? "visible" : "none" }, paint: { "fill-color": nightPaint().color, "fill-opacity": nightPaint().opacity, "fill-antialias": false } }, before);
     });
   }
   const api = {
