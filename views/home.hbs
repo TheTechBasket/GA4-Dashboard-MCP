@@ -10,16 +10,17 @@
   /* Spike rule popover */
   .c-strip .sums .counts { display: grid; gap: 4px; }
   .live-home .c-strip { grid-template-columns: auto minmax(0, 1fr) auto auto; }
-  .globe-tile { width: 88px; aspect-ratio: 1; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: var(--r-lg); background: var(--surface-2); color: var(--text-2); text-decoration: none; font-size: .75rem; font-weight: 500; transition: background-color .12s ease, color .12s ease, transform .15s var(--ease-out); }
-  .globe-tile svg { width: 48px; height: 48px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+  .globe-tile { width: 96px; aspect-ratio: 1; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: var(--r-lg); background: var(--surface-2); color: var(--text-2); text-decoration: none; font-size: .75rem; font-weight: 500; transition: background-color .12s ease, color .12s ease, transform .15s var(--ease-out); }
+  .globe-tile svg, .globe-tile canvas { width: 64px; height: 64px; }
+  .globe-tile svg { fill: none; stroke: currentColor; stroke-width: 1.5; }
   .globe-tile:hover { background: var(--accent-soft); color: var(--accent-fg); }
   .globe-tile:active { transform: scale(.97); }
   #navMenu .nb-rs { margin-left: auto; font-size: .75rem; }
   @media (max-width: 860px) {
     .live-home .c-strip { grid-template-columns: minmax(0, 1fr) auto; }
     .live-home .c-strip > .chart, .live-home .c-strip > .sums { grid-column: 1 / -1; }
-    .globe-tile { grid-row: 1; grid-column: 2; width: 64px; }
-    .globe-tile svg { width: 36px; height: 36px; }
+    .globe-tile { grid-row: 1; grid-column: 2; width: 76px; }
+    .globe-tile svg, .globe-tile canvas { width: 48px; height: 48px; }
   }
   .pop { position: fixed; z-index: 30; top: calc(var(--nav-h, 52px) + 8px); right: max(16px, calc((100vw - 1320px) / 2)); width: min(320px, calc(100vw - 32px)); padding: 14px; display: grid; gap: 12px; text-align: left; background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--r-lg); box-shadow: var(--pop-shadow); opacity: 0; transform: translateY(-4px); visibility: hidden; transition: opacity .15s var(--ease-out), transform .15s var(--ease-out), visibility 0s linear .15s; }
   .pop.open { opacity: 1; transform: none; visibility: visible; transition-delay: 0s; }
@@ -189,3 +190,7 @@
   const QUOTA = {{{ json_stringify quota }}};
   const CACHE_AGE = {{{ json_stringify cacheAge }}};
 </script>
+{{! Mini globe in the live strip tile: same d3 and topojson builds as /globe, so the browser cache serves both. }}
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script defer src="/js/miniGlobe.js"></script>
