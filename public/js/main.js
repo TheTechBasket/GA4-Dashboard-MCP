@@ -270,16 +270,39 @@ if (document.getElementById('quotaMeters')) {
     } catch { /* banner falls back to the baseline line */ }
   }
 
-  // ── Spike rule popover ──
-  const ruleBtn = document.getElementById('ruleBtn');
+  // ── Spike rule: Settings menu group (presets + Custom) and the custom popover ──
+  const navMenu = document.getElementById('navMenu');
+  const gear = document.getElementById('navSettings');
   const rulePop = document.getElementById('rulePop');
   const zIn = document.getElementById('ruleZ');
   const liftIn = document.getElementById('ruleLift');
   const presetBtns = rulePop ? [...rulePop.querySelectorAll('[data-preset]')] : [];
+  let menuPresets = [];
+  let ruleSummary = null;
   let reasonsTimer = null;
 
+  if (navMenu && rulePop) {
+    const grp = document.createElement('div');
+    grp.className = 'nb-grp';
+    grp.setAttribute('role', 'group');
+    grp.setAttribute('aria-labelledby', 'nbRuleL');
+    const blank = '<span class="nb-i" aria-hidden="true"></span>';
+    const check = '<svg class="nb-i nb-ck" aria-hidden="true"><use href="#nb-check"/></svg>';
+    grp.innerHTML = '<div class="nb-gl" id="nbRuleL">Spike rule</div>'
+      + Object.keys(PRESETS).map(k => `<button type="button" class="nb-mi" role="menuitemradio" aria-checked="false" tabindex="-1" data-rule-preset="${k}">${blank}${k[0].toUpperCase() + k.slice(1)}${check}</button>`).join('')
+      + `<button type="button" class="nb-mi" role="menuitemradio" aria-checked="false" tabindex="-1" data-rule-custom aria-haspopup="dialog"><svg class="nb-i" aria-hidden="true"><use href="#nb-setup"/></svg>Custom<span class="faint num nb-rs" id="ruleSummary"></span></button>`;
+    navMenu.insertBefore(grp, navMenu.querySelector('[aria-labelledby="nbSetupL"]'));
+    menuPresets = [...grp.querySelectorAll('[data-rule-preset]')];
+    ruleSummary = document.getElementById('ruleSummary');
+  }
+
+  function closeNavMenu() {
+    navMenu.hidden = true;
+    gear.setAttribute('aria-expanded', 'false');
+  }
+
   function syncRuleUi() {
-    if (!ruleBtn) return;
+    if (!rulePop) return;
     zIn.value = rule.z;
     liftIn.value = rule.lift;
     const name = Object.keys(PRESETS).find(k => PRESETS[k].z === rule.z && PRESETS[k].lift === rule.lift);
@@ -288,7 +311,11 @@ if (document.getElementById('quotaMeters')) {
       b.setAttribute('aria-checked', String(on));
       b.tabIndex = on || (!name && b === presetBtns[0]) ? 0 : -1;
     });
-    document.getElementById('ruleSummary').textContent = name ? name[0].toUpperCase() + name.slice(1) : `z ${rule.z}, ${rule.lift}x`;
+    menuPresets.forEach(b => b.setAttribute('aria-checked', String(b.dataset.rulePreset === name)));
+    if (ruleSummary) {
+      ruleSummary.textContent = name ? '' : `z ${rule.z}, ${rule.lift}x`;
+      ruleSummary.parentElement.setAttribute('aria-checked', String(!name));
+    }
   }
 
   function setRule(next) {
@@ -303,14 +330,17 @@ if (document.getElementById('quotaMeters')) {
 
   function openPop(open) {
     rulePop.classList.toggle('open', open);
-    ruleBtn.setAttribute('aria-expanded', String(open));
     if (open) (presetBtns.find(b => b.tabIndex === 0) || zIn).focus();
   }
 
-  if (ruleBtn && rulePop) {
+  if (rulePop) {
     syncRuleUi();
-    ruleBtn.addEventListener('click', () => openPop(!rulePop.classList.contains('open')));
-    document.getElementById('ruleClose').addEventListener('click', () => { openPop(false); ruleBtn.focus(); });
+    if (navMenu) navMenu.addEventListener('click', e => {
+      const p = e.target.closest('[data-rule-preset]');
+      if (p) { setRule(PRESETS[p.dataset.rulePreset]); closeNavMenu(); gear.focus(); return; }
+      if (e.target.closest('[data-rule-custom]')) { e.stopPropagation(); closeNavMenu(); openPop(true); }
+    });
+    document.getElementById('ruleClose').addEventListener('click', () => { openPop(false); gear.focus(); });
     document.getElementById('ruleReset').addEventListener('click', () => setRule(PRESETS.normal));
     presetBtns.forEach((b, i) => {
       b.addEventListener('click', () => { setRule(PRESETS[b.dataset.preset]); b.focus(); });
@@ -330,10 +360,10 @@ if (document.getElementById('quotaMeters')) {
     zIn.addEventListener('change', onInput);
     liftIn.addEventListener('change', onInput);
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && rulePop.classList.contains('open')) { openPop(false); ruleBtn.focus(); }
+      if (e.key === 'Escape' && rulePop.classList.contains('open')) { openPop(false); gear.focus(); }
     });
     document.addEventListener('click', e => {
-      if (rulePop.classList.contains('open') && !rulePop.contains(e.target) && !ruleBtn.contains(e.target)) openPop(false);
+      if (rulePop.classList.contains('open') && !rulePop.contains(e.target)) openPop(false);
     });
   }
 
