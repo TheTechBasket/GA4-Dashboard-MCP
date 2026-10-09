@@ -1,5 +1,10 @@
-// Register TypeScript support — must be first, before any .ts file is required
-require('ts-node').register({ transpileOnly: true, files: true });
+// TypeScript support for controllers/*.ts in dev. Must run before any .ts file is required.
+// The Docker image compiles them to .js and ships without ts-node.
+try {
+	require('ts-node').register({ transpileOnly: true, files: true });
+} catch (err) {
+	if (err.code !== 'MODULE_NOT_FOUND') throw err;
+}
 
 const express = require('express');
 const exphbs = require('express-handlebars');
@@ -40,7 +45,7 @@ if (process.env.NODE_ENV === 'development') {
         // Inject livereload script tag into all HTML responses
         app.use(connectLivereload());
 
-        console.log('   🔄 LiveReload active — watching views/ and public/');
+        console.log('   🔄 LiveReload active, watching views/ and public/');
     } catch (err) {
         console.warn('[livereload] Not available, run: npm install --save-dev livereload connect-livereload');
     }
@@ -56,7 +61,7 @@ app.use(express.static('public'));
 
 if (process.env.NODE_ENV === 'development') {
 	app.use(morgan('dev'));
-	app.locals.baseurl = 'http://localhost:3000';
+	app.locals.baseurl = 'http://localhost:5483';
 	console.log('development mode');
 }
 
@@ -153,7 +158,7 @@ app.use("/", apiroutes);
 app.locals.demo = require('./controllers/demoData').enabled();
 
 /* Express Server Listening */
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5483;
 app.listen(port, () => {
 	const serverUrl = `http://localhost:${port}`;
 	console.log(`\n🚀 GA4 Dashboard & MCP server running!`);
