@@ -5,10 +5,17 @@ const {
     getAnalyticsCardConfig,
     getAnalyticsCatalog,
     getDateRange,
+    getPreviousDateRange,
+    attachPrev,
 } = require("./analyticsRecipes");
 const { runSafeHistoricalReport, runSafeRealtimeReport, CREDENTIALS_PATH } = require("./ga4Service");
 const { stripSensitiveGlobeUsersPayload } = require("./privacy");
-const { cacheGet, cacheSet, cacheCleanup } = require("./reportCache");
+const { cacheGet, cacheSet, cacheCleanup, shouldBypass } = require("./reportCache");
+
+/** ?fresh=1 skips the cache read (the result is still cached), at most once per minute per key. */
+function wantFresh(req, namespace, key) {
+    return req.query.fresh === "1" && shouldBypass(`${namespace}:${key}`);
+}
 const { analyticsUrl, websiteUrl } = require("./propertyActions");
 const { runExtraCard } = require("./reportExtras");
 
@@ -489,7 +496,7 @@ exports.trafficSpikes = async (req, res) => {
         const opts = parseSpikeOpts(req.query);
         // One cache entry per rule, so different settings never share results.
         const cacheKey = `all:z${opts.z}:l${opts.lift}`;
-        const cached = await cacheGet("spike", cacheKey);
+        const cached = wantFresh(req, "spike", cacheKey) ? null : await cacheGet("spike", cacheKey);
         if (cached) {
             return res.json({ ...cached, cached: true });
         }
@@ -891,7 +898,7 @@ exports.analyticsCard = async (req, res) => {
 
     // ── Check cache first (skip caching for realtime-summary-like queries) ──
     const cacheKey = `${propertyId}:${type}:${range}` + (seg ? `:${seg}` : "");
-    const cached = await cacheGet("card", cacheKey);
+    const cached = wantFresh(req, "card", cacheKey) ? null : await cacheGet("card", cacheKey);
     if (cached) {
         return res.json({ ...cached, cached: true });
     }
@@ -910,7 +917,7 @@ exports.analyticsCard = async (req, res) => {
             const extra = await runExtraCard({
                 cfg, type, propertyId, dateRange, seg, ownHost, run: runSafeHistoricalReport,
             });
-            const payload = { ...extra, type, range, timeSeries: false, currencyCode };
+            const payload = { ...extra, type, range, timeSeries: false, currencyCode, fetchedAt: Date.now() };
             cacheSet("card", cacheKey, payload).catch(() => {});
             return res.json(payload);
         } catch (err) {
@@ -933,7 +940,7 @@ exports.analyticsCard = async (req, res) => {
             ? [{ dimension: { dimensionName: cfg.dimensions[0] || "date" }, desc: false }]
             : [{ metric: { metricName: cfg.metrics[0] }, desc: true }];
 
-        const response = await runSafeHistoricalReport({
+        const query = {
             propertyId,
             dimensions: cfg.dimensions.map(name => ({ name })),
             metrics: metricObjects,
@@ -942,7 +949,16 @@ exports.analyticsCard = async (req, res) => {
             limit,
             orderBys,
             metricAggregations: ["TOTAL"],
-        });
+        };
+        // Previous period runs alongside; a wider table limit so rows that fell in rank still match.
+        const [response, prevResponse] = await Promise.all([
+            runSafeHistoricalReport(query),
+            runSafeHistoricalReport({
+                ...query,
+                dateRange: getPreviousDateRange(range),
+                limit: cfg.timeSeries ? limit : Math.max(cfg.limit * 5, 50),
+            }).catch(err => ({ ok: false, error: err.message })),
+        ]);
 
         if (!response.ok) throw new Error(response.error || "Report query failed");
 
@@ -975,8 +991,22 @@ exports.analyticsCard = async (req, res) => {
 
         res.json(payload);
     } catch (err) {
+            fetchedAt: Date.now(),
         console.error(`[analytics-card] ${type}:`, err.message);
         res.status(500).json({ error: err.message });
+        if (prevResponse.ok) {
+            const prevRows = (prevResponse.rows || []).map(row => ({
+                dims:    row.dimensionValues.map(d => d.value),
+                metrics: row.metricValues.map(m => parseFloat(m.value || "0")),
+            }));
+            if (cfg.timeSeries) payload.prevRows = prevRows;
+            else payload.rows = attachPrev(rows, prevRows);
+            const prevTotals = prevResponse.totals?.[0]?.metricValues;
+            if (prevTotals) payload.prevTotals = prevTotals.map(m => parseFloat(m.value || "0"));
+        } else {
+            console.warn(`[analytics-card] ${type} previous period:`, prevResponse.error);
+        }
+
     }
 };
 
@@ -1021,7 +1051,7 @@ exports.analyticsReports = async (req, res) => {
 
     // ── Check disk cache first ──
     const cacheKey = `${propertyId}:reports:${range}`;
-    const cached = await cacheGet("report", cacheKey);
+    const cached = wantFresh(req, "report", cacheKey) ? null : await cacheGet("report", cacheKey);
     if (cached) {
         return res.json({ ...cached, cached: true });
     }

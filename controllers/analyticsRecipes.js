@@ -275,6 +275,23 @@ function getDateRange(range) {
   return clone(DATE_RANGES[range] || DATE_RANGES["28d"]);
 }
 
+// Same-length window right before getDateRange(range).
+const PREV_RANGES = {
+  today: { startDate: "yesterday", endDate: "yesterday" },
+  "7d": { startDate: "15daysAgo", endDate: "8daysAgo" },
+  "28d": { startDate: "57daysAgo", endDate: "29daysAgo" },
+};
+
+function getPreviousDateRange(range) {
+  return clone(PREV_RANGES[range] || PREV_RANGES["28d"]);
+}
+
+// Adds `prev` (metric array, or null when the row is absent) to each row, matched on joined dims.
+function attachPrev(rows, prevRows) {
+  const byKey = new Map(prevRows.map(r => [r.dims.join("\u0001"), r.metrics]));
+  return rows.map(r => ({ ...r, prev: byKey.get(r.dims.join("\u0001")) || null }));
+}
+
 function getAnalyticsCardConfig(type) {
   const config = CARD_CONFIGS[type];
   return config ? clone(config) : null;
@@ -291,4 +308,6 @@ module.exports = {
   getAnalyticsCardConfig,
   getAnalyticsCatalog,
   getDateRange,
+  getPreviousDateRange,
+  attachPrev,
 };

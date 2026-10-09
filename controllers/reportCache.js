@@ -155,7 +155,26 @@ async function cacheCleanup() {
   return cleaned;
 }
 
+/**
+ * Rate limit for ?fresh=1 cache bypass: at most once per FRESH_GAP_MS per key.
+ * Inside the window the caller serves cache as normal.
+ */
+const FRESH_GAP_MS = 60 * 1000;
+const lastFresh = new Map();
+
+function shouldBypass(key, now = Date.now()) {
+  const last = lastFresh.get(key);
+  if (last !== undefined && now - last < FRESH_GAP_MS) return false;
+  lastFresh.set(key, now);
+  if (lastFresh.size > 500) {
+    for (const [k, t] of lastFresh) if (now - t >= FRESH_GAP_MS) lastFresh.delete(k);
+  }
+  return true;
+}
+
 module.exports = {
+  shouldBypass,
+  FRESH_GAP_MS,
   cacheGet,
   cacheSet,
   cacheDel,
