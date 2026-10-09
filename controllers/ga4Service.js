@@ -10,6 +10,8 @@ const path = require("path");
 const { BetaAnalyticsDataClient } = require("@google-analytics/data");
 const { AnalyticsAdminServiceClient } = require("@google-analytics/admin");
 
+const demo = require("./demoData");
+
 const REPO_ROOT = path.join(__dirname, "..");
 
 /**
@@ -31,7 +33,8 @@ function resolveCredentialsPath() {
   }
 }
 
-const CREDENTIALS_PATH = resolveCredentialsPath();
+// Demo mode: a sentinel path so the setup gate passes; the getters below hand out fake clients.
+const CREDENTIALS_PATH = demo.enabled() ? "demo" : resolveCredentialsPath();
 
 let dataClientInstance = null;
 let adminClientInstance = null;
@@ -42,7 +45,7 @@ let latestQuotaSnapshot = null;
  */
 function getGA4DataClient(keyFilename = CREDENTIALS_PATH) {
   if (!dataClientInstance) {
-    dataClientInstance = new BetaAnalyticsDataClient({ keyFilename });
+    dataClientInstance = demo.enabled() ? demo.dataClient() : new BetaAnalyticsDataClient({ keyFilename });
   }
   return dataClientInstance;
 }
@@ -52,7 +55,7 @@ function getGA4DataClient(keyFilename = CREDENTIALS_PATH) {
  */
 function getGA4AdminClient(keyFilename = CREDENTIALS_PATH) {
   if (!adminClientInstance) {
-    adminClientInstance = new AnalyticsAdminServiceClient({ keyFilename });
+    adminClientInstance = demo.enabled() ? demo.adminClient() : new AnalyticsAdminServiceClient({ keyFilename });
   }
   return adminClientInstance;
 }

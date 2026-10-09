@@ -2,14 +2,21 @@
 
 Real-time Google Analytics 4 (GA4) dashboard featuring a 3D interactive globe visualization, traffic spike detection, visitor insights, and a standalone Model Context Protocol (MCP) server for AI assistants.
 
-![GA4 Dashboard & MCP screenshot](ss/ss_1785120214.webp)
+![GA4 Dashboard & MCP globe: live visitors as avatars, a city card and the live event feed](docs/screenshots/globe.webp)
 
 <details>
 <summary>More screenshots</summary>
 
-![Screenshot](ss/ss_1785120026.webp)
-![Screenshot](ss/ss_1785120087.webp)
-![Screenshot](ss/ss_1785120302.webp)
+<table>
+<tr>
+<td width="33%"><img src="docs/screenshots/home.webp" alt="Dashboard home with live users per site"></td>
+<td width="33%"><img src="docs/screenshots/analytics.webp" alt="Analytics page with trend chart and what changed"></td>
+<td width="33%"><img src="docs/screenshots/globe-dark.webp" alt="Globe in dark theme with day and night shade"></td>
+</tr>
+<tr><td>Home</td><td>Analytics</td><td>Globe, dark theme</td></tr>
+</table>
+
+Screenshots use demo mode (generated data, fictional sites).
 
 </details>
 
@@ -21,7 +28,7 @@ Real-time Google Analytics 4 (GA4) dashboard featuring a 3D interactive globe vi
 - **3D Interactive Globe**: Visualizes live website activity across world countries in real time using Three.js.
 - **Spike Detection**: Automatically detects sudden traffic surges and classifies traffic sources (referral, direct, campaign).
 - **Visitor Insights**: Aggregates persona cards for new vs. returning visitors, device breakdowns, and top geography.
-- **Standalone MCP Server**: Query GA4 properties, funnels, and reports directly from AI tools (Claude Desktop, Antigravity, Cursor) — lives in `mcp-server/`, independent of the dashboard.
+- **Standalone MCP Server**: Query GA4 properties, funnels, and reports directly from AI tools (Claude Desktop, Antigravity, Cursor). It lives in `mcp-server/`, independent of the dashboard.
 - **Privacy Shield**: Redacts full URL parameters and query strings to prevent private data leakage on dashboards.
 - **Smart Caching & Quota Protection**: Disk + in-memory caching layers with automatic background property metadata updates to preserve GA4 API quota.
 - **First-run setup page**: If no GA4 credentials are found, the dashboard shows a `/setup` page with the steps below instead of crashing.
@@ -37,6 +44,8 @@ Real-time Google Analytics 4 (GA4) dashboard featuring a 3D interactive globe vi
 ---
 
 ## Setup
+
+Try it without Google credentials: `pnpm demo` (generated data for 8 fictional sites, a "Demo data" badge shows in the bar).
 
 ### 1. Clone and install
 
@@ -55,7 +64,7 @@ pnpm install
 
 ### 3. Place the key file
 
-Copy the downloaded `ga4dataapi-*.json` into the project root, next to `app.js`. The dashboard resolves it automatically by filename pattern — no path to configure.
+Copy the downloaded `ga4dataapi-*.json` into the project root, next to `app.js`. The dashboard resolves it automatically by filename pattern, no path to configure.
 
 Prefer to keep the key elsewhere? Copy `.env.example` to `.env` and set `GA4_CREDENTIALS_PATH` to point at it instead:
 
@@ -63,7 +72,7 @@ Prefer to keep the key elsewhere? Copy `.env.example` to `.env` and set `GA4_CRE
 GA4_CREDENTIALS_PATH=/absolute/path/to/your-key.json
 ```
 
-Key files matching `ga4dataapi-*.json` in the project root are already git-ignored — safe to drop in directly.
+Key files matching `ga4dataapi-*.json` in the project root are already git-ignored, so it is safe to drop in directly.
 
 ### 4. Start the app
 
@@ -83,7 +92,7 @@ Once running:
 
 ## Optional: the MCP server
 
-`mcp-server/` is a standalone MCP server exposing GA4 Admin + Data API tools to MCP clients (Claude Desktop, Antigravity, Cursor). It's a separate package with its own dependencies and credentials — the dashboard above works without it.
+`mcp-server/` is a standalone MCP server exposing GA4 Admin + Data API tools to MCP clients (Claude Desktop, Antigravity, Cursor). It's a separate package with its own dependencies and credentials. The dashboard above works without it.
 
 ```bash
 cd mcp-server

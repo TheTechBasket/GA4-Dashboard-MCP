@@ -8,6 +8,7 @@
     "build": "tsc",
     "css": "npx tailwindcss -i ./public/css/main.scss -o ./public/css/main.css --watch",
     "start": "node app.js",
+    "demo": "DEMO=1 node app.js",
     "test": "mocha test/**/*.test.js"
   },
   "repository": {

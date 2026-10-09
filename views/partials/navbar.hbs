@@ -17,6 +17,7 @@
     <span class="nb-mark"><svg class="nb-i"><use href="#nb-bars"/></svg></span>
   </a>
   {{#if nav.title}}<span class="nb-title">{{nav.title}}</span>{{/if}}
+  {{#if @root.demo}}<span class="badge" title="Generated sample data, not from Google Analytics">Demo data</span>{{/if}}
 
   <button type="button" class="nb-cmd" id="jumpOpen" aria-haspopup="dialog" aria-controls="jumpDlg" aria-keyshortcuts="Control+K Meta+K" aria-label="Jump to a page, site or report">
     <svg class="nb-i"><use href="#nb-search"/></svg>

@@ -8,7 +8,8 @@ const {
     getPreviousDateRange,
     attachPrev,
 } = require("./analyticsRecipes");
-const { runSafeHistoricalReport, runSafeRealtimeReport, CREDENTIALS_PATH } = require("./ga4Service");
+const { runSafeHistoricalReport, runSafeRealtimeReport, getGA4DataClient, getGA4AdminClient, CREDENTIALS_PATH } = require("./ga4Service");
+const demo = require("./demoData");
 const { stripSensitiveGlobeUsersPayload } = require("./privacy");
 const { buildGlobeUsersPayload, refreshInfo } = require("./globeUsers");
 const { getFavicon } = require("./favicons");
@@ -23,7 +24,7 @@ function wantFresh(req, namespace, key) {
 const { analyticsUrl, websiteUrl } = require("./propertyActions");
 const { runExtraCard } = require("./reportExtras");
 
-const CACHE_DIR = path.join(__dirname, "..", ".cache");
+const CACHE_DIR = demo.cacheDir(path.join(__dirname, "..", ".cache"));
 const PROPERTIES_CACHE_PATH = path.join(CACHE_DIR, "properties.json");
 
 /** How long before the properties cache is considered stale (hours) */
@@ -156,12 +157,7 @@ async function getAnalyticsProperties(credentialsJsonPath) {
 }
 
 function getAnalyticsAdminClient(credentialsJsonPath = CREDENTIALS_PATH) {
-    if (!analyticsAdminClient) {
-        const { AnalyticsAdminServiceClient } = require("@google-analytics/admin");
-        analyticsAdminClient = new AnalyticsAdminServiceClient({
-            keyFilename: credentialsJsonPath,
-        });
-    }
+    if (!analyticsAdminClient) analyticsAdminClient = getGA4AdminClient(credentialsJsonPath);
     return analyticsAdminClient;
 }
 
@@ -222,10 +218,7 @@ async function batchRealtimeReport({
     properties,
     credentialsJsonPath = CREDENTIALS_PATH,
 }) {
-    const { BetaAnalyticsDataClient } = require("@google-analytics/data");
-    const analyticsDataClient = new BetaAnalyticsDataClient({
-        keyFilename: credentialsJsonPath,
-    });
+    const analyticsDataClient = getGA4DataClient(credentialsJsonPath);
 
     // Capture quota from the first successful response (project-level pool is shared)
     let quotaAggregate = null;
@@ -493,7 +486,8 @@ exports.favicon = async (req, res) => {
     const cache = await getCachedProperties();
     const prop = cache?.properties?.find((p) => p.id === id);
     if (!prop) return res.sendStatus(404);
-    const file = await getFavicon(id, prop.url).catch(() => null);
+    // Demo sites are fictional: always the letter tile, never a remote fetch
+    const file = demo.enabled() ? null : await getFavicon(id, prop.url).catch(() => null);
     if (!file) {
         // No icon found: same letter tile the client draws, so the <img> never errors.
         const { letter, color } = letterTile(prop.site, Number(id));
@@ -677,8 +671,7 @@ async function saveGlobeDataToCache(payload) {
 }
 
 async function fetchGlobeCountryData(properties) {
-    const { BetaAnalyticsDataClient } = require("@google-analytics/data");
-    const client = new BetaAnalyticsDataClient({ keyFilename: CREDENTIALS_PATH });
+    const client = getGA4DataClient();
 
     // One report per property with country + countryId dimensions
     const results = await Promise.all(

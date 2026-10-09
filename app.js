@@ -122,6 +122,9 @@ https://expressjs.com/en/guide/routing.html
 // for image creation api
 app.use("/", apiroutes);
 
+// Demo mode (DEMO=1): generated data, no Google credentials. Views show a "Demo data" badge.
+app.locals.demo = require('./controllers/demoData').enabled();
+
 /* Express Server Listening */
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
@@ -130,6 +133,7 @@ app.listen(port, () => {
 	console.log(`   ➜ Local Dashboard: ${serverUrl}`);
 	console.log(`   ➜ 3D Globe View:   ${serverUrl}/globe`);
 	console.log(`   ➜ Analytics View:  ${serverUrl}/analytics\n`);
+	if (app.locals.demo) console.log('   Demo mode: generated data, no GA4 calls\n');
 
 	// Warm country metadata cache in background (restcountries.com → .cache/countries.json)
 	const { warmCountriesCache } = require('./controllers/countriesCache');
@@ -152,7 +156,7 @@ app.listen(port, () => {
 
 	// Trigger a properties cache refresh on startup when --refresh-cache is passed,
 	// e.g.: node app.js --refresh-cache
-	if (process.argv.includes('--refresh-cache')) {
+	if (process.argv.includes('--refresh-cache') || app.locals.demo) {
 		const { refreshPropertiesCache } = require('./controllers/apiController');
 		refreshPropertiesCache()
 			.then((props) =>

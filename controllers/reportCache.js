@@ -13,7 +13,7 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 
-const CACHE_ROOT = path.join(__dirname, "..", ".cache", "reports");
+const CACHE_ROOT = path.join(require("./demoData").cacheDir(path.join(__dirname, "..", ".cache")), "reports");
 const MAX_AGE_DAYS = 7; // cleanup files older than this
 const TTL_DEFAULTS = {
   card: 60 * 60 * 1000,     // 1 hour for analytics cards
