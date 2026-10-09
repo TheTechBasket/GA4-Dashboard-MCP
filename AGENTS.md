@@ -1,4 +1,4 @@
-# GA4 Dashboard & MCP
+# GA4 Dashboard
 
 ## Design
 @DESIGN.md

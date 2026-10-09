@@ -1,8 +1,8 @@
-# GA4 Dashboard & MCP
+# GA4 Dashboard
 
 Real-time Google Analytics 4 (GA4) dashboard with a live globe, traffic spike detection, visitor insights, and a Model Context Protocol (MCP) server for AI assistants.
 
-![GA4 Dashboard & MCP globe: live visitors as avatars, a city card and the live event feed](docs/screenshots/globe.webp)
+![GA4 Dashboard globe: live visitors as avatars, a city card and the live event feed](docs/screenshots/globe.webp)
 
 <details>
 <summary>More screenshots</summary>

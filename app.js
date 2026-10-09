@@ -125,7 +125,7 @@ app.get('/api/setup/status', async (req, res) => {
 app.get('/setup', (req, res) => {
 	const mcp = SETUP_DOC.mcp.split('<project folder>').join(__dirname);
 	res.render('setup', {
-		head: { title: 'GA4 Dashboard & MCP · Setup', description: 'Connect Google Analytics and use it with AI', image: '', url: '' },
+		head: { title: 'GA4 Dashboard · Setup', description: 'Connect Google Analytics and use it with AI', image: '', url: '' },
 		prompt: SETUP_DOC.prompt,
 		manual: SETUP_DOC.manual,
 		mcpPrompt: mcp,
@@ -161,7 +161,7 @@ app.locals.demo = require('./controllers/demoData').enabled();
 const port = process.env.PORT || 5483;
 app.listen(port, () => {
 	const serverUrl = `http://localhost:${port}`;
-	console.log(`\n🚀 GA4 Dashboard & MCP server running!`);
+	console.log(`\n🚀 GA4 Dashboard server running!`);
 	console.log(`   ➜ Local Dashboard: ${serverUrl}`);
 	console.log(`   ➜ 3D Globe View:   ${serverUrl}/globe`);
 	console.log(`   ➜ Analytics View:  ${serverUrl}/analytics\n`);

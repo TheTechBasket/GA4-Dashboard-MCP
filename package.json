@@ -1,7 +1,7 @@
 {
-  "name": "ga4-dashboard-and-mcp",
+  "name": "ga4-dashboard",
   "version": "2.0.0",
-  "description": "GA4 Dashboard & MCP: real-time Google Analytics 4 dashboard featuring 3D globe visualization, traffic spike detection, visitor insights, and an embedded MCP server.",
+  "description": "GA4 Dashboard: real-time Google Analytics 4 dashboard featuring 3D globe visualization, traffic spike detection, visitor insights, and an embedded MCP server.",
   "main": "app.js",
   "scripts": {
     "dev": "nodemon",

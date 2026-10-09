@@ -1,7 +1,7 @@
 # ga4-mcp-server
 
 MCP server exposing Google Analytics Admin + Data API tools. It is part of the
-GA4 Dashboard & MCP repo: one `pnpm install` at the root covers it, and it
+GA4 Dashboard repo: one `pnpm install` at the root covers it, and it
 reads credentials from the root `.env`.
 
 ## Setup

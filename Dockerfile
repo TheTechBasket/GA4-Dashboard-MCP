@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# GA4 Dashboard & MCP. Credentials come from env (GA4_CLIENT_EMAIL, GA4_PRIVATE_KEY), never a file.
+# GA4 Dashboard. Credentials come from env (GA4_CLIENT_EMAIL, GA4_PRIVATE_KEY), never a file.
 
 FROM node:22-alpine AS pnpm
 ENV PNPM_HOME=/pnpm
