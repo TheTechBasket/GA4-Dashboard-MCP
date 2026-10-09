@@ -740,7 +740,7 @@ async function fetchGlobeCountryData(properties) {
 
 const GLOBE_USERS_CACHE_PATH = path.join(CACHE_DIR, "globe_users.json");
 /* Bump when the payload shape changes: an older build's cache file (no per-city sites, no feed) is then refetched, not served */
-const GLOBE_USERS_CACHE_V = 2;
+const GLOBE_USERS_CACHE_V = 3; // 3: per-city IANA tz
 const GLOBE_USERS_TTL_SEC = 30;
 const GLOBE_USERS_MAX_AGE_SEC = 300;
 

@@ -1,10 +1,11 @@
 <link rel="stylesheet" href="/css/panel.css" />
 <style>
   /* Map-only tokens (DESIGN.md exception, like the dither fill). Plain values, not light-dark(): the canvas engine reads them with getComputedStyle. */
-  :root { --sea: #e4e5ec; --land: #ffffff; --landline: #d4d4dc; --grat: rgba(24,24,27,.05); --space: #f7f7f9; --halo: rgba(79,70,229,.16); --indline: #a8a8b4; }
-  :root[data-theme="dark"] { --sea: #0f0f13; --land: #1d1d23; --landline: #33333c; --grat: rgba(255,255,255,.04); --space: #060608; --halo: rgba(129,140,248,.22); --indline: #5a5a66; }
-  :root[data-map="outdoors"] { --sea: #4a9fd8; --land: #9cd08a; --landline: #6f9f5f; --grat: rgba(30,80,110,.08); --space: #eef4f7; --halo: rgba(70,150,200,.35); --indline: #7d7488; }
-  :root[data-theme="dark"][data-map="outdoors"] { --sea: #0b3a5e; --land: #24502f; --landline: #3a6d47; --grat: rgba(160,210,240,.05); --space: #04080b; --halo: rgba(90,170,230,.25); --indline: #7d7488; }
+  :root { --sea: #e4e5ec; --land: #ffffff; --landline: #d4d4dc; --grat: rgba(24,24,27,.05); --space: #f7f7f9; --halo: rgba(79,70,229,.16); --indline: #a8a8b4; --night: rgba(30,32,64,.07); }
+  :root[data-theme="dark"] { --sea: #0f0f13; --land: #1d1d23; --landline: #33333c; --grat: rgba(255,255,255,.04); --space: #060608; --halo: rgba(129,140,248,.22); --indline: #5a5a66; --night: rgba(0,0,0,.2); }
+  :root[data-map="outdoors"] { --sea: #4a9fd8; --land: #9cd08a; --landline: #6f9f5f; --grat: rgba(30,80,110,.08); --space: #eef4f7; --halo: rgba(70,150,200,.35); --indline: #7d7488; --night: rgba(8,12,32,.14); }
+  :root[data-theme="dark"][data-map="outdoors"] { --sea: #0b3a5e; --land: #24502f; --landline: #3a6d47; --grat: rgba(160,210,240,.05); --space: #04080b; --halo: rgba(90,170,230,.25); --indline: #7d7488; --night: rgba(0,0,0,.2); }
+  /* --night: one of 4 stacked night circles (day/night shade), so the core is about 4x this alpha */
 
   /* Vivid looks (MapLibre globe, Outdoors): dark space backdrop and a stronger blue halo in both themes */
   :root[data-gspace="dark"] { --space: #05070d; --halo: rgba(74,159,216,.55); }
@@ -91,6 +92,7 @@
   .grf p { margin: 0; line-height: 1.45; }
   .grf .warn { color: var(--warn); }
   .grf .lw { border-top: 1px solid var(--border); padding-top: 10px; }
+  .grf .lw + .lw { border-top: 0; padding-top: 0; }
   .lw { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-2); }
   .lw input { accent-color: var(--accent); margin: 0; }
 
@@ -181,6 +183,12 @@
   .gcity .site { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .gcity .site > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gcity .foot { font-size: 12px; color: var(--text-3); }
+  /* Local time and day or night: header sub line, compact (icon + time) in the stack list */
+  .dn, .gcity .ct > .dn { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
+  .dn svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .dn .dy { color: var(--warn); }
+  .dn .nt { color: var(--accent-fg); }
+  .glist .dn { flex: none; }
   .gcity .glist { max-height: 168px; margin: 0 -4px; }
   .gcity .glist button { padding: 4px; gap: 8px; }
   .gcity .glist .ct b { font-size: 13px; font-weight: 500; }
@@ -260,6 +268,7 @@
     </div>
     <p class="num" id="rfNext"></p>
     <p id="rfCap"></p>
+    <label class="lw"><input type="checkbox" id="gNight" /> Day and night shade</label>
     <label class="lw"><input type="checkbox" id="gLight" /> Lightweight map</label>
   </div>
   <div class="gtip" id="gtip" role="tooltip" hidden></div>
@@ -281,4 +290,5 @@
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script src="/js/clusterMarks.js"></script>
 <script src="/js/letterTile.js"></script>
+<script src="/js/sun.js"></script>
 <script src="/js/globe.js"></script>

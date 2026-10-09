@@ -27,6 +27,7 @@ const ICON = {
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   full: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
@@ -50,6 +51,7 @@ const state = {
   feed: true, filter: null, sel: null, list: null, f: { site: "", country: "", device: "" },
   panel: narrow() ? "min" : load("globe.panel") === "min" ? "min" : "open",
   avatar: load("globe.avatar") === "sites" ? "sites" : "people",
+  night: load("globe.night") !== "off",
   data: null, cities: [], feedKeys: new Set(), newKeys: new Set(),
 };
 root.dataset.map = state.style;
@@ -173,6 +175,31 @@ function placeMarks() {
   if (!card.hidden) positionCard();
 }
 
+/* ── Day and night (variant A): 4 stacked circles around the anti-solar point, each filled with the map-only
+   --night token, so dusk reads as a gradient. Sun math in sun.js; recomputed every 60 s (tickNight). ── */
+const NIGHT_R = [90, 84, 78, 72];
+/* A spherical polygon as flat lng/lat rings. d3's equirectangular stream cuts it at the antimeridian and walks the
+   pole edge when it covers a pole; a plain lng/lat ring cannot say that, and MapLibre reads GeoJSON as flat. */
+const PLATE = d3.geoEquirectangular().scale(180 / Math.PI).translate([0, 0]).precision(0);
+function flatRings(geo) {
+  const rings = []; let ring = null;
+  d3.geoPath(PLATE, {
+    moveTo(x, y) { ring = [[x, -y]]; rings.push(ring); },
+    lineTo(x, y) { ring.push([x, -y]); },
+    closePath() { ring.push(ring[0]); },
+    arc() {}, rect() {},
+  })(geo);
+  return rings.filter((r) => r.length > 3);
+}
+/* circles: sphere polygons for the canvas engine; fc: flat features for MapLibre, property i = circle index */
+function nightShapes(d = new Date()) {
+  const s = Sun.sun(d), anti = [s.lng + 180, -s.lat];
+  const circles = NIGHT_R.map((r) => d3.geoCircle().center(anti).radius(r).precision(2)());
+  const features = circles.flatMap((c, i) => flatRings(c).map((ring) => ({ type: "Feature", properties: { i }, geometry: { type: "Polygon", coordinates: [ring] } })));
+  return { circles, fc: { type: "FeatureCollection", features } };
+}
+let night = nightShapes();
+
 /* ── Canvas engine (d3 orthographic / equirectangular, no tiles) ── */
 let world = null;
 async function loadWorld() {
@@ -224,6 +251,7 @@ function canvasEngine() {
       ctx.beginPath(); path({ type: "Sphere" }); ctx.fillStyle = css("--sea"); ctx.fill();
       ctx.beginPath(); path(graticule); ctx.strokeStyle = css("--grat"); ctx.lineWidth = 1; ctx.stroke();
       ctx.beginPath(); path(world.land); ctx.fillStyle = css("--land"); ctx.fill();
+      if (state.night) { ctx.fillStyle = css("--night"); for (const c of night.circles) { ctx.beginPath(); path(c); ctx.fill(); } } /* above land, under the India borders */
       ctx.beginPath(); path(world.borders); ctx.strokeStyle = css("--landline"); ctx.lineWidth = 0.6; ctx.stroke();
       if (globe) { /* sphere shading: light from top left, darker limb */
         const g = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.45, r * 0.05, cx, cy, r);
@@ -259,6 +287,7 @@ function canvasEngine() {
       requestAnimationFrame(f);
     },
     setStyle() { api.draw(); },
+    setNight() { api.draw(); },
     setProjection() { k = 1; api.resize(); },
     spin(dt) { if (drag || flying || cardOpen() || !proj) return; rot[0] += dt * 0.004; /* d3 centers on -rot[0]: center longitude goes down, west to east */ proj.rotate(rot); api.draw(); },
     destroy() { dead = true; api.ready = false; canvas?.removeEventListener("wheel", onWheel); canvas?.remove(); },
@@ -304,6 +333,7 @@ function mlEngine() {
       else if (/state|water|sea|ocean|marine|region/.test(l.id)) map.setLayerZoomRange(l.id, Math.max(5, l.minzoom || 0), max);
       else map.setLayerZoomRange(l.id, Math.max(4, l.minzoom || 0), max);
     }
+    addNight();
     if (!map.getSource("ind")) map.addSource("ind", { type: "geojson", data: borders });
     if (!map.getLayer("ind-borders")) map.addLayer({ id: "ind-borders", type: "line", source: "ind", paint: {
       "line-color": css("--indline"),
@@ -311,6 +341,15 @@ function mlEngine() {
       "line-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0.4, 4, 0.8],
     } });
     sky();
+  }
+  /* Night fills sit under the place labels and the India borders (added after them), above land and water */
+  function addNight() {
+    if (!map.getSource("night")) map.addSource("night", { type: "geojson", data: night.fc });
+    const before = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
+    NIGHT_R.forEach((_, i) => {
+      if (!map.getLayer(`night-${i}`)) map.addLayer({ id: `night-${i}`, type: "fill", source: "night", filter: ["==", ["get", "i"], i],
+        layout: { visibility: state.night ? "visible" : "none" }, paint: { "fill-color": css("--night"), "fill-antialias": false } }, before);
+    });
   }
   const api = {
     name: "ml", horizonPad: 0.2, ready: false,
@@ -349,6 +388,11 @@ function mlEngine() {
       return true;
     },
     setStyle() { map?.setStyle(styleUrl(), { diff: false }); },
+    setNight() {
+      if (!map?.getSource("night")) return;
+      map.getSource("night").setData(night.fc);
+      NIGHT_R.forEach((_, i) => map.setLayoutProperty(`night-${i}`, "visibility", state.night ? "visible" : "none"));
+    },
     setProjection() { try { map.setProjection({ type: state.flat ? "mercator" : "globe" }); } catch { /* noop */ } sky(); placeMarks(); },
     /* setCenter is a jumpTo, and jumpTo calls stop(), which resets every gesture handler. The spin loop
        must never run while the user holds or wheels the map (see userBusy), or a pan or zoom dies. */
@@ -387,9 +431,11 @@ async function startEngine(name) {
 
 /* ── Summary panel (variant A): live count header, filter chips, top countries, sites ── */
 /* name: the country, as alt and hover title where the flag stands in for the country text */
-/* GA4 sends "(not set)", "(other)" or "" when the country is unknown: neutral tile, "--", no /api/flag request */
+/* GA4 sends "(not set)" or "" when the country is unknown: neutral tile, "--", no /api/flag request.
+   "(other)" is GA4's high-cardinality bucket: neutral tile too, but its own "Other" row. */
 const knownCC = (cc) => /^[A-Z]{2}$/.test(cc || "");
-const countryName = (cc, name) => knownCC(cc) && name && name !== "(not set)" ? name : "--";
+const OTHER = "(other)";
+const countryName = (cc, name) => cc === OTHER ? "Other" : knownCC(cc) && name && name !== "(not set)" ? name : "--";
 const flagHtml = (cc, name = "") => knownCC(cc)
   ? `<img class="flag" alt="${esc(name)}"${name ? ` title="${esc(name)}"` : ""} src="/api/flag/${cc.toLowerCase()}">`
   : '<span class="flag" aria-hidden="true"></span>';
@@ -432,9 +478,9 @@ function renderSummary() {
     chipHtml("site", "Site", "Filter by site", sites.map((s) => ({ v: String(s.id), label: s.site, icon: favHtml(s) }))) +
     chipHtml("country", "Country", "Filter by country", countries.filter((c) => knownCC(c.id)).map((c) => ({ v: c.id, label: c.name }))) +
     chipHtml("device", "Device", "Filter by device", (d.devices || []).map((x) => String(x.name).toLowerCase()).filter((k) => DEVICE[k]).map((k) => ({ v: k, label: DEVICE[k] })));
-  /* Top countries: GA4 totals when unfiltered, else summed from the filtered cities. Unknown countries share one "--" row. */
+  /* Top countries: GA4 totals when unfiltered, else summed from the filtered cities. Unknown countries share one "--" row, "(other)" has its own. */
   const m = new Map();
-  const add = (id, name, n) => { const k = knownCC(id) ? id : "--"; const r = m.get(k) || { id: k, name: countryName(id, name), n: 0 }; r.n += n; m.set(k, r); };
+  const add = (id, name, n) => { const k = knownCC(id) || id === OTHER ? id : "--"; const r = m.get(k) || { id: k, name: countryName(id, name), n: 0 }; r.n += n; m.set(k, r); };
   if (filtered) for (const c of state.cities) add(c.countryId, c.country, c.count);
   else for (const c of countries) add(c.id, c.name, c.count);
   const top = [...m.values()].sort((a, b) => b.n - a.n);
@@ -467,6 +513,31 @@ function renderFeed() {
 /* ── City card and group list (variant A): renderCityCard()/renderList() and the ".gcity" CSS block in globe.hbs
    are the whole design, swap them together. Both render synchronously from the live feed already in memory;
    only images (flag, favicons) load after first paint, over a --surface-3 placeholder. ── */
+/* Local time and day or night for a city: "<sun|moon> 9:42 PM local · Day"; compact (stack list) is icon + time.
+   No tz from the server: no time, Day or Night still comes from the sun altitude at the city. */
+const tfmts = new Map();
+function localTime(tz, d) {
+  if (!tz) return "";
+  try {
+    if (!tfmts.has(tz)) tfmts.set(tz, new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: tz }));
+    return tfmts.get(tz).format(d);
+  } catch { return ""; } /* unknown zone name */
+}
+function dnHtml(lat, lng, tz, compact = false) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+  const d = new Date(), nt = Sun.isNight(lat, lng, d), t = localTime(tz, d), word = nt ? "Night" : "Day";
+  const ic = `<svg viewBox="0 0 24 24" class="${nt ? "nt" : "dy"}" role="img" aria-label="${word}">${ICON[nt ? "moon" : "sun"]}</svg>`;
+  const txt = compact ? (t ? `<span class="num">${t}</span>` : "") : `${t ? `<span class="num">${t}</span> local · ` : ""}${word}`;
+  return `<span class="dn" data-lat="${lat}" data-lng="${lng}" data-tz="${esc(tz || "")}"${compact ? " data-compact" : ""}${compact ? ` title="${t ? `${t} local, ` : ""}${word}"` : ""}>${ic}${txt}</span>`;
+}
+/* every 60 s: move the night shade and the card times */
+function tickNight() {
+  night = nightShapes();
+  if (engine?.ready) engine.setNight();
+  card.querySelectorAll(".dn").forEach((el) => { el.outerHTML = dnHtml(Number(el.dataset.lat), Number(el.dataset.lng), el.dataset.tz, el.hasAttribute("data-compact")); });
+}
+setInterval(tickNight, 60000);
+
 const closeBtn = () => `<button type="button" class="ib x" data-t="close" aria-label="Close">${svg("x")}</button>`;
 /* g (stack card only): { title, ids } adds a "N cities near X" title and the member city list */
 function renderCityCard(c, g = null) {
@@ -476,12 +547,12 @@ function renderCityCard(c, g = null) {
   const foot = [["Mobile", dv.mobile], ["Desktop", dv.desktop], ["Tablet", dv.tablet]].filter(([, n]) => n > 0).map(([l, n]) => `${l} <span class="num">${fmt(n)}</span>`);
   if (c.lastSeen != null) foot.push(`Last seen ${c.lastSeen ? `<span class="num">${c.lastSeen}</span> min ago` : "now"}`);
   return `<div class="gcity">
-  <div class="ch">${flagHtml(c.countryId, c.country)}<div class="ct"><b>${g ? g.title : esc(c.city)}</b></div><div class="stack" aria-label="${sites.length} ${sites.length === 1 ? "site" : "sites"}">${sites.slice(0, 3).map(favHtml).join("")}${more}</div></div>
+  <div class="ch">${flagHtml(c.countryId, c.country)}<div class="ct"><b>${g ? g.title : esc(c.city)}</b>${g ? "" : dnHtml(c.lat, c.lng, c.tz)}</div><div class="stack" aria-label="${sites.length} ${sites.length === 1 ? "site" : "sites"}">${sites.slice(0, 3).map(favHtml).join("")}${more}</div></div>
   <div class="cb">
     <div class="kv"><div><small>Active</small><b class="num">${fmt(c.count)}</b></div><div><small>Views</small><b class="num">${fmt(c.views)}</b></div><div><small>Key events</small><b class="num">${fmt(c.keyEvents)}</b></div></div>
     ${c.topPage ? `<div class="tp"><small>Top page</small><div class="page" data-privacy title="${esc(c.topPage)}">${esc(c.topPage)}</div></div>` : ""}
     ${sites.length ? `<div class="tw"><table class="tbl"><thead><tr><th>Site</th><th>Users</th><th>Views</th></tr></thead><tbody>${sites.map((x) => `<tr><td><span class="site">${favHtml(x)}<span data-privacy title="${esc(x.topPage || "")}">${esc(x.name)}</span></span></td><td class="num">${fmt(x.users)}</td><td class="num">${fmt(x.views)}</td></tr>`).join("")}</tbody></table></div>` : ""}
-    ${g ? `<ul class="glist" aria-label="Cities in this stack">${g.ids.map((i) => { const x = state.cities[i]; return `<li><button type="button" data-i="${i}">${flagHtml(x.countryId, countryName(x.countryId, x.country))}<span class="ct"><b>${esc(x.city)}</b></span><span class="num">${fmt(x.count)}</span></button></li>`; }).join("")}</ul>` : ""}
+    ${g ? `<ul class="glist" aria-label="Cities in this stack">${g.ids.map((i) => { const x = state.cities[i]; return `<li><button type="button" data-i="${i}">${flagHtml(x.countryId, countryName(x.countryId, x.country))}<span class="ct"><b>${esc(x.city)}</b></span>${dnHtml(x.lat, x.lng, x.tz, true)}<span class="num">${fmt(x.count)}</span></button></li>`; }).join("")}</ul>` : ""}
     ${foot.length ? `<div class="foot">${foot.join(" · ")}</div>` : ""}
   </div>
   </div>`;
@@ -649,6 +720,7 @@ function syncTools() {
   stage.dataset.av = state.avatar;
   $("#gNote").textContent = state.avatar === "sites" ? "Icon = top site in a city. Stack = nearby cities, click to open." : "Avatar = city. Stack = nearby cities, click to open.";
   $("#gLight").checked = state.engine === "canvas" || engine?.name === "canvas";
+  $("#gNight").checked = state.night;
   /* Dark space backdrop for the vivid looks (MapLibre globe or Outdoors) */
   if ((engine?.name !== "canvas" && !state.flat) || state.style === "outdoors") root.dataset.gspace = "dark"; else delete root.dataset.gspace;
 }
@@ -720,6 +792,10 @@ stage.addEventListener("pointerover", (e) => { const b = tipBtn(e); if (b) showT
 stage.addEventListener("pointerout", (e) => { if (tipBtn(e) && !tipBtn(e).contains(e.relatedTarget)) hideTip(); });
 stage.addEventListener("focusin", (e) => { const b = tipBtn(e); if (b?.matches(":focus-visible")) showTip(b); });
 stage.addEventListener("focusout", hideTip);
+$("#gNight").addEventListener("change", (e) => {
+  state.night = e.target.checked; save("globe.night", state.night ? "on" : "off");
+  if (engine?.ready) engine.setNight();
+});
 $("#gLight").addEventListener("change", (e) => {
   state.engine = e.target.checked ? "canvas" : "ml"; save("globe.engine", state.engine);
   closeCard(); startEngine(state.engine);

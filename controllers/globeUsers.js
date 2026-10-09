@@ -1,6 +1,8 @@
 /* Globe users: pure helpers for /api/globe-users (row-to-payload builder, quota-aware refresh interval).
    No I/O here so mocha can test it without GA4 credentials. */
 
+const tzLookup = require("tz-lookup");
+
 const NOT_SET = "(not set)";
 const FEED_MAX = 40;
 
@@ -25,6 +27,11 @@ function countryName(id) {
     try { return regionNames.of(id) || id; } catch { return id; }
 }
 
+/** IANA time zone for a coordinate, offline (tz-lookup). Null when the lookup fails. */
+function defaultTz(lat, lng) {
+    try { return tzLookup(lat, lng) || null; } catch { return null; }
+}
+
 const topKey = (counts) => {
     let best = null, n = -1;
     for (const [k, v] of counts) if (v > n) { best = k; n = v; }
@@ -39,8 +46,9 @@ const topKey = (counts) => {
  * @param {Array<{prop, rows}>} userResults query 1 per property: city, countryId, deviceCategory, platform | activeUsers, screenPageViews, keyEvents
  * @param {Array<{prop, rows}>} eventResults query 2 per property: city, unifiedScreenName, minutesAgo | screenPageViews, keyEvents
  * @param {(city: string) => [number, number] | null} getCoords
+ * @param {(lat: number, lng: number) => string | null} [getTz] IANA zone for a coordinate (offline lookup)
  */
-function buildGlobeUsersPayload(userResults, eventResults, getCoords) {
+function buildGlobeUsersPayload(userResults, eventResults, getCoords, getTz = defaultTz) {
     const cityMap = new Map();
     const countryMap = new Map();
     const deviceMap = new Map();
@@ -69,6 +77,7 @@ function buildGlobeUsersPayload(userResults, eventResults, getCoords) {
                 if (!cityMap.has(key)) {
                     cityMap.set(key, {
                         city, country, countryId: ctryId, lat: coords[0], lng: coords[1],
+                        tz: getTz(coords[0], coords[1]),
                         count: 0, views: 0, keyEvents: 0,
                         devices: { mobile: 0, desktop: 0, tablet: 0 },
                         color: seedColor(`${city}${ctryId}`),
