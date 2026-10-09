@@ -69,8 +69,10 @@
   .chip:not(.set) { flex-shrink: 0; } /* "All" never shrinks; only a chip with a value set may ellipsize */
   /* Customizable select (Chrome 135+) so options can carry site icons; other browsers show a plain select */
   .chip select, .chip ::picker(select) { appearance: base-select; }
-  .chip select { min-width: 0; border: 0; background: none; color: inherit; font: inherit; padding: 0; margin: 0; cursor: pointer; field-sizing: content; display: inline-flex; align-items: center; height: 22px; line-height: 22px; max-width: 88px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; outline: none; }
+  .chip select { min-width: 0; border: 0; background: none; color: inherit; font: inherit; padding: 0; margin: 0; cursor: pointer; field-sizing: content; display: inline-flex; align-items: center; height: 22px; line-height: 22px; max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; outline: none; }
   .chip select::picker-icon { display: none; }
+  .chip select > button { all: unset; display: inline-flex; align-items: center; min-width: 0; white-space: nowrap; }
+  .chip .cv { white-space: nowrap; }
   .chip ::picker(select) { margin-top: 6px; padding: 4px; min-width: 180px; max-width: 280px; max-height: 320px; border: 1px solid var(--border-2); border-radius: var(--r-lg); background: var(--surface); color: var(--text); box-shadow: var(--pop-shadow); }
   .chip option { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: var(--r); font-size: 12px; color: var(--text); background: var(--surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chip option:hover, .chip option:focus-visible { background: var(--surface-2); outline: none; }
@@ -179,6 +181,9 @@
   .gcity .site { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .gcity .site > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gcity .foot { font-size: 12px; color: var(--text-3); }
+  .gcity .glist { max-height: 168px; margin: 0 -4px; }
+  .gcity .glist button { padding: 4px; gap: 8px; }
+  .gcity .glist .ct b { font-size: 13px; font-weight: 500; }
 
   /* Site faces: favicon or letter tile */
   .fav { width: 20px; height: 20px; border-radius: 2px; flex: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; background: #fff; object-fit: contain; box-shadow: 0 0 0 2px var(--surface); }

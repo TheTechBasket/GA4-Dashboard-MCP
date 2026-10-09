@@ -74,10 +74,10 @@ function tileHtml(s) {
 }
 const favHtml = (s) => !s.id || noFav.has(String(s.id)) ? tileHtml(s)
   : `<img class="fav" alt="" src="/api/favicon/${encodeURIComponent(s.id)}" data-id="${esc(s.id)}" data-n="${esc(siteName(s))}" data-privacy>`;
-/* Broken favicon becomes a letter tile, broken flag is dropped. Capture phase: error does not bubble. */
+/* Broken favicon becomes a letter tile, broken flag a neutral tile. Capture phase: error does not bubble. */
 document.addEventListener("error", (e) => {
   const im = e.target;
-  if (im.classList?.contains("flag")) im.remove();
+  if (im.classList?.contains("flag")) im.outerHTML = '<span class="flag" aria-hidden="true"></span>';
   else if (im.classList?.contains("fav")) { noFav.add(im.dataset.id); im.outerHTML = tileHtml({ id: im.dataset.id, name: im.dataset.n }); }
 }, true);
 /* Marker face: a DiceBear person, or in Sites mode the city's top site icon */
@@ -95,8 +95,8 @@ const GROUP_PX = 56, SPLIT_PX = 64, RECLUSTER_MS = 500, FACE_STEP = 11;
 const markEls = new Map();
 let groups = [], keyIdx = new Map(), clusterAt = 0, clusterZoom = "", forceCluster = true;
 function renderMarks() { keyIdx = new Map(state.cities.map((c, i) => [cityKey(c), i])); forceCluster = true; placeMarks(); }
-/* hover title carries the count (no badge); set on hover so privacy blur is respected */
-marks.addEventListener("pointerover", (e) => { const m = e.target.closest(".mk"); if (m) m.title = document.body.classList.contains("privacy-blur") ? "" : m._label || ""; });
+/* hover title carries the count (no badge); it names only cities, so privacy mode leaves it */
+marks.addEventListener("pointerover", (e) => { const m = e.target.closest(".mk"); if (m) m.title = m._label || ""; });
 /* A press or wheel that starts on a marker still moves the map: the marker forwards it to the engine's input
    element (MapLibre and d3.drag track the rest of the drag on the document). A click opens the card only when
    the pointer did not travel, so a drag that starts on a marker does not open one. */
@@ -387,9 +387,20 @@ async function startEngine(name) {
 
 /* ── Summary panel (variant A): live count header, filter chips, top countries, sites ── */
 /* name: the country, as alt and hover title where the flag stands in for the country text */
-const flagHtml = (cc, name = "") => /^[A-Z]{2}$/.test(cc || "")
+/* GA4 sends "(not set)", "(other)" or "" when the country is unknown: neutral tile, "--", no /api/flag request */
+const knownCC = (cc) => /^[A-Z]{2}$/.test(cc || "");
+const countryName = (cc, name) => knownCC(cc) && name && name !== "(not set)" ? name : "--";
+const flagHtml = (cc, name = "") => knownCC(cc)
   ? `<img class="flag" alt="${esc(name)}"${name ? ` title="${esc(name)}"` : ""} src="/api/flag/${cc.toLowerCase()}">`
   : '<span class="flag" aria-hidden="true"></span>';
+/* Filter chip: "All", or the chosen value cut to 14 characters with the full value as hover title.
+   The <button> is the customizable-select face (Chrome 135+); other browsers drop it and show the plain select. */
+const short = (s, n = 14) => (s = String(s ?? "")).length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s;
+function chipHtml(f, key, label, items) {
+  const cur = state.f[f], sel = items.find((x) => x.v === cur);
+  const shown = sel ? sel.label : "All", priv = f === "site" ? " data-privacy" : "";
+  return `<label class="chip${sel ? " set" : ""}"${sel ? ` title="${esc(shown)}"` : ""}><span class="k">${key}</span><select data-f="${f}" aria-label="${label}"${priv}><button type="button"><span class="cv">${esc(short(shown))}</span></button>${opt("", "All", cur)}${items.map((x) => opt(x.v, x.label, cur, x.icon || "")).join("")}</select></label>`;
+}
 const DEVICE = { mobile: "Mobile", desktop: "Desktop", tablet: "Tablet" };
 /* Filters narrow the markers: a site filter shows that site's numbers per city, a device filter that device's users */
 function viewCities(users) {
@@ -418,16 +429,15 @@ function renderSummary() {
   const countries = d.countries || [];
   /* not while a filter menu is open, a poll would close it */
   if (!$("#gChips").contains(document.activeElement)) $("#gChips").innerHTML =
-    `<label class="chip" data-privacy><span class="k">Site</span><select data-f="site" aria-label="Filter by site">${opt("", "All", state.f.site)}${sites.map((s) => opt(String(s.id), s.site, state.f.site, favHtml(s))).join("")}</select></label>` +
-    `<label class="chip"><span class="k">Country</span><select data-f="country" aria-label="Filter by country">${opt("", "All", state.f.country)}${countries.filter((c) => /^[A-Z]{2}$/.test(c.id)).map((c) => opt(c.id, c.name, state.f.country)).join("")}</select></label>` +
-    `<label class="chip"><span class="k">Device</span><select data-f="device" aria-label="Filter by device">${opt("", "All", state.f.device)}${(d.devices || []).map((x) => String(x.name).toLowerCase()).filter((k) => DEVICE[k]).map((k) => opt(k, DEVICE[k], state.f.device)).join("")}</select></label>`;
-  /* Top countries: GA4 totals when unfiltered, else summed from the filtered cities */
-  let top = countries.map((c) => ({ id: c.id, name: c.name, n: c.count }));
-  if (filtered) {
-    const m = new Map();
-    for (const c of state.cities) { const r = m.get(c.countryId) || { id: c.countryId, name: c.country, n: 0 }; r.n += c.count; m.set(c.countryId, r); }
-    top = [...m.values()].sort((a, b) => b.n - a.n);
-  }
+    chipHtml("site", "Site", "Filter by site", sites.map((s) => ({ v: String(s.id), label: s.site, icon: favHtml(s) }))) +
+    chipHtml("country", "Country", "Filter by country", countries.filter((c) => knownCC(c.id)).map((c) => ({ v: c.id, label: c.name }))) +
+    chipHtml("device", "Device", "Filter by device", (d.devices || []).map((x) => String(x.name).toLowerCase()).filter((k) => DEVICE[k]).map((k) => ({ v: k, label: DEVICE[k] })));
+  /* Top countries: GA4 totals when unfiltered, else summed from the filtered cities. Unknown countries share one "--" row. */
+  const m = new Map();
+  const add = (id, name, n) => { const k = knownCC(id) ? id : "--"; const r = m.get(k) || { id: k, name: countryName(id, name), n: 0 }; r.n += n; m.set(k, r); };
+  if (filtered) for (const c of state.cities) add(c.countryId, c.country, c.count);
+  else for (const c of countries) add(c.id, c.name, c.count);
+  const top = [...m.values()].sort((a, b) => b.n - a.n);
   $("#gCountries").innerHTML = top.length ? `<span class="lbl">Top countries</span>${top.slice(0, 5).map((c) => `<div class="row">${flagHtml(c.id)}<span class="n">${esc(c.name)}</span><span class="v num">${fmt(c.n)}</span></div>`).join("")}` : "";
   $("#gSites").innerHTML = sites.length ? `<span class="lbl rh"><span>Sites</span>${d.keyEvents ? `<span class="key"><span class="num">${fmt(d.keyEvents)}</span> key events</span>` : ""}</span>${sites.slice(0, 5).map((s) => `<div class="row">${favHtml(s)}<span class="n" data-privacy>${esc(s.site)}</span><span class="v num">${fmt(s.count)}</span></div>`).join("")}` : "";
   renderRefresh();
@@ -437,7 +447,7 @@ function renderSummary() {
 const feedKey = (f) => `${f.city}|${f.countryId}|${f.site}|${f.page}|${f.event}`;
 const VIEW_EVENTS = new Set(["page_view", "screen_view"]);
 function feedLi(f, isNew) {
-  const where = f.city === "(not set)" ? "an unknown city" : `<b data-privacy>${esc(f.city)}</b>`;
+  const where = f.city === "(not set)" ? "an unknown city" : `<b>${esc(f.city)}</b>`;
   const page = `<em data-privacy>${esc(f.page)}</em>`;
   const times = f.count > 1 ? ` <span class="num">${f.count}</span> times` : "";
   const ev = f.isKey ? `<span class="key">${esc(f.event)}</span>` : esc(f.event);
@@ -449,7 +459,7 @@ function feedLi(f, isNew) {
 }
 function renderFeed() {
   const rows = (state.data?.feed || []).filter((f) => !state.filter || f.city === state.filter);
-  feedHead.innerHTML = `<b>Live events</b><span>${state.filter ? `<span data-privacy>${esc(state.filter)}</span> only, <button type="button" data-t="clear">show all</button>` : "Press M to hide"}</span>`;
+  feedHead.innerHTML = `<b>Live events</b><span>${state.filter ? `<span>${esc(state.filter)}</span> only, <button type="button" data-t="clear">show all</button>` : "Press M to hide"}</span>`;
   feedList.innerHTML = rows.map((f) => feedLi(f, state.newKeys.has(feedKey(f)))).join("")
     || `<li class="empty">${state.data ? "No events in the last 30 min." : "Loading events"}</li>`;
 }
@@ -458,21 +468,43 @@ function renderFeed() {
    are the whole design, swap them together. Both render synchronously from the live feed already in memory;
    only images (flag, favicons) load after first paint, over a --surface-3 placeholder. ── */
 const closeBtn = () => `<button type="button" class="ib x" data-t="close" aria-label="Close">${svg("x")}</button>`;
-function renderCityCard(c) {
+/* g (stack card only): { title, ids } adds a "N cities near X" title and the member city list */
+function renderCityCard(c, g = null) {
   const dv = c.devices || {};
   const sites = c.sites || [];
   const more = sites.length > 3 ? `<span class="more num">+${sites.length - 3}</span>` : "";
   const foot = [["Mobile", dv.mobile], ["Desktop", dv.desktop], ["Tablet", dv.tablet]].filter(([, n]) => n > 0).map(([l, n]) => `${l} <span class="num">${fmt(n)}</span>`);
   if (c.lastSeen != null) foot.push(`Last seen ${c.lastSeen ? `<span class="num">${c.lastSeen}</span> min ago` : "now"}`);
   return `<div class="gcity">
-  <div class="ch">${flagHtml(c.countryId, c.country)}<div class="ct"><b data-privacy>${esc(c.city)}</b></div><div class="stack" aria-label="${sites.length} ${sites.length === 1 ? "site" : "sites"}">${sites.slice(0, 3).map(favHtml).join("")}${more}</div></div>
+  <div class="ch">${flagHtml(c.countryId, c.country)}<div class="ct"><b>${g ? g.title : esc(c.city)}</b></div><div class="stack" aria-label="${sites.length} ${sites.length === 1 ? "site" : "sites"}">${sites.slice(0, 3).map(favHtml).join("")}${more}</div></div>
   <div class="cb">
     <div class="kv"><div><small>Active</small><b class="num">${fmt(c.count)}</b></div><div><small>Views</small><b class="num">${fmt(c.views)}</b></div><div><small>Key events</small><b class="num">${fmt(c.keyEvents)}</b></div></div>
     ${c.topPage ? `<div class="tp"><small>Top page</small><div class="page" data-privacy title="${esc(c.topPage)}">${esc(c.topPage)}</div></div>` : ""}
     ${sites.length ? `<div class="tw"><table class="tbl"><thead><tr><th>Site</th><th>Users</th><th>Views</th></tr></thead><tbody>${sites.map((x) => `<tr><td><span class="site">${favHtml(x)}<span data-privacy title="${esc(x.topPage || "")}">${esc(x.name)}</span></span></td><td class="num">${fmt(x.users)}</td><td class="num">${fmt(x.views)}</td></tr>`).join("")}</tbody></table></div>` : ""}
+    ${g ? `<ul class="glist" aria-label="Cities in this stack">${g.ids.map((i) => { const x = state.cities[i]; return `<li><button type="button" data-i="${i}">${flagHtml(x.countryId, countryName(x.countryId, x.country))}<span class="ct"><b>${esc(x.city)}</b></span><span class="num">${fmt(x.count)}</span></button></li>`; }).join("")}</ul>` : ""}
     ${foot.length ? `<div class="foot">${foot.join(" · ")}</div>` : ""}
   </div>
   </div>`;
+}
+/* Stack card: the members summed into one city-shaped object (sites merged by id), largest city first */
+function groupCity(ids) {
+  const cs = ids.map((i) => state.cities[i]), lead = cs[0], sites = new Map();
+  const sum = (k) => cs.reduce((n, c) => n + (Number(c[k]) || 0), 0);
+  const dev = (k) => cs.reduce((n, c) => n + (Number(c.devices?.[k]) || 0), 0);
+  for (const c of cs) for (const s of c.sites || []) {
+    const r = sites.get(String(s.id)) || { ...s, users: 0, views: 0, keyEvents: 0, top: -1 };
+    r.users += s.users || 0; r.views += s.views || 0; r.keyEvents += s.keyEvents || 0;
+    if ((s.users || 0) > r.top) { r.top = s.users || 0; r.topPage = s.topPage; } /* hover title: the page from the city with most users */
+    sites.set(String(s.id), r);
+  }
+  const seen = cs.map((c) => c.lastSeen).filter((v) => v != null);
+  return {
+    city: lead.city, countryId: lead.countryId, country: lead.country,
+    count: sum("count"), views: sum("views"), keyEvents: sum("keyEvents"),
+    devices: { mobile: dev("mobile"), desktop: dev("desktop"), tablet: dev("tablet") },
+    sites: [...sites.values()].sort((a, b) => b.users - a.users),
+    lastSeen: seen.length ? Math.min(...seen) : null, topPage: null,
+  };
 }
 function showCard(html, label) {
   card.innerHTML = closeBtn() + html;
@@ -513,14 +545,12 @@ function renderCard() {
 function renderList() {
   const ids = state.list.map((k) => keyIdx.get(k)).filter((i) => i != null && state.cities[i]).sort((a, b) => state.cities[b].count - state.cities[a].count);
   if (!ids.length) return closeCard();
-  const users = ids.reduce((n, i) => n + state.cities[i].count, 0);
-  showCard(`<div class="gcity">
-  <div class="ch"><div class="ct"><b><span class="num">${ids.length}</span> cities</b><span><span class="num">${fmt(users)}</span> active users. Zoom in to split.</span></div></div>
-  <div class="cb"><ul class="glist">${ids.map((i) => { const c = state.cities[i]; return `<li><button type="button" data-i="${i}">${flagHtml(c.countryId, c.country)}<span class="ct"><b data-privacy>${esc(c.city)}</b></span><span class="num">${fmt(c.count)}</span></button></li>`; }).join("")}</ul>
-  <div class="foot">Click a city for its details.</div></div>
-  </div>`, "Nearby cities");
+  if (ids.length === 1) { state.list = null; state.sel = ids[0]; state.filter = state.cities[ids[0]].city; renderMarks(); renderFeed(); return renderCard(); }
+  const lead = state.cities[ids[0]];
+  const title = `<span class="num">${ids.length}</span> cities near ${esc(lead.city)}`;
+  showCard(renderCityCard(groupCity(ids), { title, ids }), `${ids.length} cities near ${lead.city}`);
 }
-/* Group: list its cities, no auto zoom (zoom by hand to split the stack) */
+/* Group: one card with the summed numbers and its cities, no auto zoom (zoom by hand to split the stack) */
 function openGroup(ids) {
   const keys = ids.map((i) => state.cities[i] && cityKey(state.cities[i])).filter(Boolean);
   if (!keys.length) return;
