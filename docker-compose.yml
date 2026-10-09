@@ -1,0 +1,13 @@
+services:
+  dashboard:
+    build: .
+    image: ghcr.io/thetechbasket/ga4-dashboard:latest
+    env_file: .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - data:/app/.data
+    restart: unless-stopped
+
+volumes:
+  data:

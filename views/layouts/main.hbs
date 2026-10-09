@@ -6,12 +6,8 @@
 		{{!-- Theme before first paint: light unless the user picked dark (navbar settings menu) --}}
 		<script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('pb_theme')==='dark'?'dark':'light')}catch(e){document.documentElement.setAttribute('data-theme','light')}</script>
 
-		{{!-- Google Fonts: DM Mono (data), Syne (headings/labels) --}}
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link
-			href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@400;500;600;700;800&display=swap"
-			rel="stylesheet" />
+		{{!-- Inter Variable, self-hosted (public/fonts, OFL) --}}
+		<link rel="preload" href="/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin />
 
 		<link rel="stylesheet" href="/css/main.css" />
 		<link rel="stylesheet" href="/css/panel.css" />

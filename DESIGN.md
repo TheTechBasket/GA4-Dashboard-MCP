@@ -146,7 +146,7 @@ Palette strategy is a tight neutral scale (six steps of surface/border/text per 
 
 ## Typography
 
-**Body/Display Font:** Inter Variable (self-hosted, `design/assets/fonts/InterVariable.woff2`, variable weight 100-900), fallback `system-ui, sans-serif`.
+**Body/Display Font:** Inter Variable (self-hosted, `public/fonts/InterVariable.woff2`, variable weight 100-900), fallback `system-ui, sans-serif`.
 **Mono/Label Font:** `ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace`, used for `.mono` (technical strings) and `.kbd` (keyboard hints).
 
 **Character:** One typeface for everything. There is no separate display face; hierarchy comes from weight, size, and letter-spacing tightening at larger sizes, not from font-switching. All numeric readouts use tabular figures (`.num`) so columns of numbers align.

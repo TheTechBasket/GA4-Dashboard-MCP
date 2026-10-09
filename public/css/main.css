@@ -1,4 +1,4 @@
-/* Fonts are loaded via <link> in the HTML head (DM Mono + Syne) */
+/* Inter Variable is self-hosted: @font-face in panel.css, preload in layouts/main.hbs */
 
 *, ::before, ::after {
   --tw-border-spacing-x: 0;
@@ -154,7 +154,7 @@ html,
   -o-tab-size: 4;
      tab-size: 4;
   /* 3 */
-  font-family: Syne, system-ui, sans-serif;
+  font-family: Inter, system-ui, sans-serif;
   /* 4 */
   font-feature-settings: normal;
   /* 5 */
@@ -243,7 +243,7 @@ code,
 kbd,
 samp,
 pre {
-  font-family: DM Mono, Courier New, monospace;
+  font-family: ui-monospace, SF Mono, Cascadia Mono, Menlo, Consolas, monospace;
   /* 1 */
   font-feature-settings: normal;
   /* 2 */
@@ -560,7 +560,7 @@ h1,
     h4,
     h5,
     h6 {
-  font-family: Syne, system-ui, sans-serif;
+  font-family: Inter, system-ui, sans-serif;
 }
 
 .\!container {

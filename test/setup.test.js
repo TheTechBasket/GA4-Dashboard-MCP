@@ -14,6 +14,11 @@ describe("credentials from env", () => {
     it("keeps real newlines as they are", () => {
         expect(getCredentials({ GA4_CLIENT_EMAIL: "a@b", GA4_PRIVATE_KEY: "x\ny" }).private_key).to.equal("x\ny");
     });
+    it("drops one pair of wrapping quotes (docker run --env-file keeps them)", () => {
+        const c = getCredentials({ GA4_CLIENT_EMAIL: "'a@b'", GA4_PRIVATE_KEY: '"-----BEGIN PRIVATE KEY-----\\nabc\\n"' });
+        expect(c.client_email).to.equal("a@b");
+        expect(c.private_key).to.equal("-----BEGIN PRIVATE KEY-----\nabc");
+    });
     it("returns null when either value is missing or blank", () => {
         expect(getCredentials({})).to.equal(null);
         expect(getCredentials({ GA4_CLIENT_EMAIL: "a@b" })).to.equal(null);

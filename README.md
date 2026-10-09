@@ -75,6 +75,22 @@ pnpm demo
 
 Generated data for 8 fictional sites. A "Demo data" badge shows in the bar.
 
+### Run with Docker
+
+Fill `.env` first (see Quick start), then:
+
+```bash
+docker run -d --name ga4-dashboard --env-file .env -p 3000:3000 ghcr.io/thetechbasket/ga4-dashboard:latest
+```
+
+Or with the compose file in this repo:
+
+```bash
+docker compose up -d
+```
+
+The image has no credentials in it. It reads them from env. Add `-e DEMO=1` instead of `--env-file .env` to try demo mode. Run the MCP server from the same image with `docker run --rm -i --env-file .env ghcr.io/thetechbasket/ga4-dashboard:latest node mcp-server/index.js`.
+
 ### MCP server
 
 The MCP server in `mcp-server/` reads the same `.env`. Register it with Claude Code from the project you want it in:
@@ -87,7 +103,7 @@ Use `--scope user` to have it in every project. The `/setup#ai` page has a promp
 
 ### Hosting publicly
 
-The app has no login. Anyone who can reach it sees your GA4 data. Run it on localhost, or put it behind Cloudflare Access or Tailscale before you expose it.
+The app has no login. Anyone who can reach it sees your GA4 data. Run it on localhost, or put it behind Cloudflare Access or Tailscale before you expose it. With Docker, publish port 3000 on localhost only (`-p 127.0.0.1:3000:3000`) and let the proxy or tunnel reach it there.
 
 ---
 

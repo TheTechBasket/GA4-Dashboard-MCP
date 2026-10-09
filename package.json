@@ -1,7 +1,7 @@
 {
   "name": "ga4-dashboard-and-mcp",
-  "version": "1.0.0",
-  "description": "GA4 Dashboard & MCP — real-time Google Analytics 4 dashboard featuring 3D globe visualization, traffic spike detection, visitor insights, and an embedded MCP server.",
+  "version": "2.0.0",
+  "description": "GA4 Dashboard & MCP: real-time Google Analytics 4 dashboard featuring 3D globe visualization, traffic spike detection, visitor insights, and an embedded MCP server.",
   "main": "app.js",
   "scripts": {
     "dev": "nodemon",
@@ -23,6 +23,7 @@
   "homepage": "https://github.com/TheTechBasket/GA4_report#readme",
   "author": "Amit Yadav",
   "license": "MIT",
+  "packageManager": "pnpm@11.25.0",
   "dependencies": {
     "@google-analytics/admin": "^9.1.0",
     "@google-analytics/data": "^6.1.0",
@@ -38,6 +39,8 @@
     "morgan": "^1.10.0",
     "open": "^8.4.2",
     "server-destroy": "^1.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
     "tz-lookup": "^6.1.25",
     "url": "^0.11.4",
     "zod": "^3.24.0"
@@ -55,8 +58,6 @@
     "nodemon": "^2.0.22",
     "prettier": "^2.8.8",
     "prettier-plugin-tailwindcss": "^0.1.13",
-    "tailwindcss": "^3.4.14",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "tailwindcss": "^3.4.14"
   }
 }
