@@ -24,7 +24,7 @@
   let size = 0, cities = [], rot = [-78, -18], last = 0;
 
   function fit() {
-    const css = (tile.querySelector('canvas, svg').getBoundingClientRect().width) || 64;
+    const css = tile.querySelector('canvas, svg').offsetWidth || 200; // offsetWidth ignores the hover scale
     const dpr = devicePixelRatio || 1;
     size = css;
     canvas.width = canvas.height = Math.round(css * dpr);
@@ -43,13 +43,14 @@
     ctx.lineWidth = .5; ctx.strokeStyle = c.line; ctx.stroke();
     const center = proj.invert([r, r]);
     const pulse = still ? 0 : (now / 1400) % 1;
-    // ponytail: top 60 cities only; at 64px more dots merge into one blob
-    cities.slice(0, 60).forEach((p, i) => {
+    const k = size / 96; // dot scale tracks globe size
+    // ponytail: top 120 cities only; more dots merge into one blob
+    cities.slice(0, 120).forEach((p, i) => {
       if (d3.geoDistance([p.lng, p.lat], center) > Math.PI / 2 - .05) return;
       const [x, y] = proj([p.lng, p.lat]);
-      const d = Math.min(2.6, 1 + Math.log2(p.count + 1) * .3);
+      const d = Math.min(2.6, 1 + Math.log2(p.count + 1) * .3) * k;
       if (pulse && i < 6) {
-        ctx.beginPath(); ctx.arc(x, y, d + pulse * 5, 0, 2 * Math.PI);
+        ctx.beginPath(); ctx.arc(x, y, d + pulse * 5 * k, 0, 2 * Math.PI);
         ctx.strokeStyle = `rgba(255,255,255,${(1 - pulse) * .8})`; ctx.lineWidth = 1; ctx.stroke();
       }
       ctx.beginPath(); ctx.arc(x, y, d, 0, 2 * Math.PI);

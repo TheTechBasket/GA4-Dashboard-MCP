@@ -10,17 +10,18 @@
   /* Spike rule popover */
   .c-strip .sums .counts { display: grid; gap: 4px; }
   .live-home .c-strip { grid-template-columns: auto minmax(0, 1fr) auto auto; }
-  .globe-tile { width: 96px; aspect-ratio: 1; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: var(--r-lg); background: var(--surface-2); color: var(--text-2); text-decoration: none; font-size: .75rem; font-weight: 500; transition: background-color .12s ease, color .12s ease, transform .15s var(--ease-out); }
-  .globe-tile svg, .globe-tile canvas { width: 64px; height: 64px; }
-  .globe-tile svg { fill: none; stroke: currentColor; stroke-width: 1.5; }
-  .globe-tile:hover { background: var(--accent-soft); color: var(--accent-fg); }
-  .globe-tile:active { transform: scale(.97); }
+  /* Globe peeks in from the strip's right edge: the tile is clipped, so part of the globe sits off-card */
+  .globe-tile { position: relative; align-self: stretch; width: 132px; min-height: 104px; margin: -16px -20px -16px 0; overflow: hidden; border-radius: 0 var(--r-lg) var(--r-lg) 0; color: var(--text-3); }
+  .globe-tile svg, .globe-tile canvas { position: absolute; left: 8px; top: 50%; width: 200px; height: 200px; margin-top: -100px; transition: transform .2s var(--ease-out); }
+  .globe-tile svg { fill: none; stroke: currentColor; stroke-width: .75; }
+  @media (hover: hover) { .globe-tile:hover canvas, .globe-tile:hover svg { transform: scale(1.04); } }
+  .globe-tile:active canvas { transform: scale(.98); }
   #navMenu .nb-rs { margin-left: auto; font-size: .75rem; }
   @media (max-width: 860px) {
     .live-home .c-strip { grid-template-columns: minmax(0, 1fr) auto; }
     .live-home .c-strip > .chart, .live-home .c-strip > .sums { grid-column: 1 / -1; }
-    .globe-tile { grid-row: 1; grid-column: 2; width: 76px; }
-    .globe-tile svg, .globe-tile canvas { width: 48px; height: 48px; }
+    .globe-tile { grid-row: 1; grid-column: 2; width: 112px; min-height: 96px; margin-bottom: 0; border-radius: 0 var(--r-lg) 0 0; }
+    .globe-tile svg, .globe-tile canvas { width: 160px; height: 160px; margin-top: -80px; }
   }
   .pop { position: fixed; z-index: 30; top: calc(var(--nav-h, 52px) + 8px); right: max(16px, calc((100vw - 1320px) / 2)); width: min(320px, calc(100vw - 32px)); padding: 14px; display: grid; gap: 12px; text-align: left; background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--r-lg); box-shadow: var(--pop-shadow); opacity: 0; transform: translateY(-4px); visibility: hidden; transition: opacity .15s var(--ease-out), transform .15s var(--ease-out), visibility 0s linear .15s; }
   .pop.open { opacity: 1; transform: none; visibility: visible; transition-delay: 0s; }
@@ -133,7 +134,6 @@
     </div>
     <a class="globe-tile" href="/globe" aria-label="Open the live globe">
       <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26"/><ellipse cx="32" cy="32" rx="11" ry="26"/><path d="M6 32h52M10 19h44M10 45h44M32 6v52"/></svg>
-      <span>Globe</span>
     </a>
   </section>
 
