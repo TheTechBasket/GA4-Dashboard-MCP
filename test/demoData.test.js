@@ -17,7 +17,7 @@ describe("demo mode", function () {
     before(async () => {
         app = spawn(process.execPath, ["app.js"], {
             cwd: path.join(__dirname, ".."),
-            env: { ...process.env, DEMO: "1", PORT: String(port), GA4_CREDENTIALS_PATH: "" },
+            env: { ...process.env, DEMO: "1", PORT: String(port) },
             stdio: "ignore",
         });
         for (let i = 0; i < 100; i++) {

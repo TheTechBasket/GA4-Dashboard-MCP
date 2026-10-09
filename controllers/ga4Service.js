@@ -5,36 +5,14 @@
  * quota tracking, and fallback defaults.
  */
 
-const fs = require("fs");
-const path = require("path");
 const { BetaAnalyticsDataClient } = require("@google-analytics/data");
 const { AnalyticsAdminServiceClient } = require("@google-analytics/admin");
 
 const demo = require("./demoData");
+const { getCredentials, clientOptions } = require("../lib/credentials");
 
-const REPO_ROOT = path.join(__dirname, "..");
-
-/**
- * Resolve the GA4 service-account key file. The filename is hash-suffixed
- * (ga4dataapi-<hash>.json) so it can't be hardcoded — glob for it instead.
- * Returns null if no matching key file is present (first-run / not configured).
- */
-function resolveCredentialsPath() {
-  if (process.env.GA4_CREDENTIALS_PATH && fs.existsSync(process.env.GA4_CREDENTIALS_PATH)) {
-    return process.env.GA4_CREDENTIALS_PATH;
-  }
-  try {
-    const match = fs.readdirSync(REPO_ROOT).find(
-      (f) => /^ga4dataapi-.+\.json$/.test(f) && f !== "ga4dataapi.example.json"
-    );
-    return match ? path.join(REPO_ROOT, match) : null;
-  } catch {
-    return null;
-  }
-}
-
-// Demo mode: a sentinel path so the setup gate passes; the getters below hand out fake clients.
-const CREDENTIALS_PATH = demo.enabled() ? "demo" : resolveCredentialsPath();
+/** True when the app can talk to GA4: demo mode, or GA4_CLIENT_EMAIL + GA4_PRIVATE_KEY in env. */
+const isConfigured = () => demo.enabled() || !!getCredentials();
 
 let dataClientInstance = null;
 let adminClientInstance = null;
@@ -43,9 +21,9 @@ let latestQuotaSnapshot = null;
 /**
  * Get or initialize cached BetaAnalyticsDataClient
  */
-function getGA4DataClient(keyFilename = CREDENTIALS_PATH) {
+function getGA4DataClient() {
   if (!dataClientInstance) {
-    dataClientInstance = demo.enabled() ? demo.dataClient() : new BetaAnalyticsDataClient({ keyFilename });
+    dataClientInstance = demo.enabled() ? demo.dataClient() : new BetaAnalyticsDataClient(clientOptions());
   }
   return dataClientInstance;
 }
@@ -53,11 +31,17 @@ function getGA4DataClient(keyFilename = CREDENTIALS_PATH) {
 /**
  * Get or initialize cached AnalyticsAdminServiceClient
  */
-function getGA4AdminClient(keyFilename = CREDENTIALS_PATH) {
+function getGA4AdminClient() {
   if (!adminClientInstance) {
-    adminClientInstance = demo.enabled() ? demo.adminClient() : new AnalyticsAdminServiceClient({ keyFilename });
+    adminClientInstance = demo.enabled() ? demo.adminClient() : new AnalyticsAdminServiceClient(clientOptions());
   }
   return adminClientInstance;
+}
+
+/** Drop cached clients so the next call uses the current env credentials (setup flow). */
+function resetClients() {
+  dataClientInstance = null;
+  adminClientInstance = null;
 }
 
 /**
@@ -95,10 +79,9 @@ async function runSafeRealtimeReport({
   fallbackMetrics = null,
   minuteRanges = [{ startMinutesAgo: 29, endMinutesAgo: 0 }],
   limit = 50,
-  keyPath = CREDENTIALS_PATH,
   client = null,
 }) {
-  const gaClient = client || getGA4DataClient(keyPath);
+  const gaClient = client || getGA4DataClient();
   
   // Filter out any dimensions not valid for realtime
   const validDims = dimensions.filter((d) => VALID_REALTIME_DIMENSIONS.has(d.name));
@@ -178,9 +161,8 @@ async function runSafeHistoricalReport({
   orderBys = null,
   dimensionFilter = null,
   metricAggregations = null,
-  keyPath = CREDENTIALS_PATH,
 }) {
-  const client = getGA4DataClient(keyPath);
+  const client = getGA4DataClient();
 
   const metricSets = [metrics];
   if (fallbackMetrics && fallbackMetrics.length > 0) {
@@ -241,6 +223,6 @@ module.exports = {
   getLatestQuota,
   runSafeRealtimeReport,
   runSafeHistoricalReport,
-  resolveCredentialsPath,
-  CREDENTIALS_PATH,
+  isConfigured,
+  resetClients,
 };

@@ -171,7 +171,6 @@ $RECYCLE.BIN/
 
 ### Google service account credentials – never commit real keys ###
 ga4dataapi-*.json
-!ga4dataapi-example.json
 
 ### Local planning notes – not part of the shipped project ###
 plans/

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-require("dotenv").config({ path: require("path").join(__dirname, ".env") });
+require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 
 const { z } = require("zod");
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
@@ -328,7 +328,7 @@ server.registerTool(
 	},
 	async ({ url, strategy, categories }) => {
 		if (!process.env.PSI_API_KEY) {
-			return asText({ error: "PSI_API_KEY not set — see mcp-server/.env.example" });
+			return asText({ error: "PSI_API_KEY not set. Add it to the root .env (see .env.example)." });
 		}
 		const params = { url, strategy, categories };
 		const result = await cachedCall({

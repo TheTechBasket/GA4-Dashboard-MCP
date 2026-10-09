@@ -9,7 +9,9 @@
     "css": "npx tailwindcss -i ./public/css/main.scss -o ./public/css/main.css --watch",
     "start": "node app.js",
     "demo": "DEMO=1 node app.js",
-    "test": "mocha test/**/*.test.js"
+    "test": "mocha test/**/*.test.js",
+    "mcp": "node mcp-server/index.js",
+    "setup:check": "node scripts/setup-check.js"
   },
   "repository": {
     "type": "git",
@@ -22,8 +24,9 @@
   "author": "Amit Yadav",
   "license": "MIT",
   "dependencies": {
-    "@google-analytics/admin": "^7.6.0",
-    "@google-analytics/data": "^2.8.0",
+    "@google-analytics/admin": "^9.1.0",
+    "@google-analytics/data": "^6.1.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
@@ -36,7 +39,8 @@
     "open": "^8.4.2",
     "server-destroy": "^1.0.1",
     "tz-lookup": "^6.1.25",
-    "url": "^0.11.4"
+    "url": "^0.11.4",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.9",

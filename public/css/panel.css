@@ -35,7 +35,7 @@
 .panel { font: 400 14px/1.5 var(--font); color: var(--text); max-width: 1320px; margin: 0 auto; padding-bottom: 96px; }
 .panel * { box-sizing: border-box; }
 .panel .num { font-variant-numeric: tabular-nums; }
-.panel h1, .panel h2, .panel h3 { margin: 0; letter-spacing: -.011em; line-height: 1.25; font-weight: 600; }
+.panel h1, .panel h2, .panel h3 { margin: 0; font-family: inherit; letter-spacing: -.011em; line-height: 1.25; font-weight: 600; }
 .panel h1 { font-size: 1.5rem; }
 .panel h2 { font-size: 1rem; }
 .panel h3 { font-size: .875rem; }

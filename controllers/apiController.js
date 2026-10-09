@@ -8,7 +8,7 @@ const {
     getPreviousDateRange,
     attachPrev,
 } = require("./analyticsRecipes");
-const { runSafeHistoricalReport, runSafeRealtimeReport, getGA4DataClient, getGA4AdminClient, CREDENTIALS_PATH } = require("./ga4Service");
+const { runSafeHistoricalReport, runSafeRealtimeReport, getGA4DataClient, getGA4AdminClient } = require("./ga4Service");
 const demo = require("./demoData");
 const { stripSensitiveGlobeUsersPayload } = require("./privacy");
 const { buildGlobeUsersPayload, refreshInfo } = require("./globeUsers");
@@ -32,7 +32,6 @@ const CACHE_TTL_HOURS = 12;
 
 /** Latest property quota snapshot – updated on every realtime batch fetch */
 let latestQuota = null;
-let analyticsAdminClient = null;
 const propertyCurrencyMemCache = new Map();
 
 /** In-memory realtime cache – prevents re-fetching on every page reload */
@@ -97,8 +96,8 @@ async function savePropertiesToCache(properties) {
 // GA4 Admin – list properties + domains
 // ---------------------------------------------------------------------------
 
-async function getAnalyticsProperties(credentialsJsonPath) {
-    const analyticsAdmin = getAnalyticsAdminClient(credentialsJsonPath);
+async function getAnalyticsProperties() {
+    const analyticsAdmin = getAnalyticsAdminClient();
 
     const [accounts] = await analyticsAdmin.listAccounts();
     if (!accounts || accounts.length === 0) throw new Error("No accounts found");
@@ -156,15 +155,11 @@ async function getAnalyticsProperties(credentialsJsonPath) {
     return enriched;
 }
 
-function getAnalyticsAdminClient(credentialsJsonPath = CREDENTIALS_PATH) {
-    if (!analyticsAdminClient) analyticsAdminClient = getGA4AdminClient(credentialsJsonPath);
-    return analyticsAdminClient;
+function getAnalyticsAdminClient() {
+    return getGA4AdminClient(); // cached in ga4Service, reset when credentials change
 }
 
-async function getPropertyCurrencyCode(
-    propertyId,
-    credentialsJsonPath = CREDENTIALS_PATH,
-) {
+async function getPropertyCurrencyCode(propertyId) {
     if (!propertyId) return "USD";
 
     if (propertyCurrencyMemCache.has(propertyId)) {
@@ -181,7 +176,7 @@ async function getPropertyCurrencyCode(
     }
 
     try {
-        const analyticsAdmin = getAnalyticsAdminClient(credentialsJsonPath);
+        const analyticsAdmin = getAnalyticsAdminClient();
         const [property] = await analyticsAdmin.getProperty({
             name: `properties/${propertyId}`,
         });
@@ -200,11 +195,9 @@ async function getPropertyCurrencyCode(
 // Public: refresh cache (called on startup or via API endpoint)
 // ---------------------------------------------------------------------------
 
-exports.refreshPropertiesCache = async function refreshPropertiesCache(
-    credentialsJsonPath = CREDENTIALS_PATH,
-) {
+exports.refreshPropertiesCache = async function refreshPropertiesCache() {
     console.log("[cache] Refreshing properties cache…");
-    const properties = await getAnalyticsProperties(credentialsJsonPath);
+    const properties = await getAnalyticsProperties();
     await savePropertiesToCache(properties);
     console.log(`[cache] Saved ${properties.length} properties.`);
     return properties;
@@ -214,11 +207,8 @@ exports.refreshPropertiesCache = async function refreshPropertiesCache(
 // GA4 Data API – batch realtime report
 // ---------------------------------------------------------------------------
 
-async function batchRealtimeReport({
-    properties,
-    credentialsJsonPath = CREDENTIALS_PATH,
-}) {
-    const analyticsDataClient = getGA4DataClient(credentialsJsonPath);
+async function batchRealtimeReport({ properties }) {
+    const analyticsDataClient = getGA4DataClient();
 
     // Capture quota from the first successful response (project-level pool is shared)
     let quotaAggregate = null;
@@ -346,7 +336,7 @@ exports.allrealtime = async (req, res) => {
 
         if (isCacheStale(cache)) {
             try {
-                const properties = await exports.refreshPropertiesCache(CREDENTIALS_PATH);
+                const properties = await exports.refreshPropertiesCache();
                 cache = { properties, lastUpdated: new Date().toISOString() };
             } catch (err) {
                 console.error(
@@ -634,7 +624,7 @@ exports.visitorInsights = async (req, res) => {
 /** POST /api/refresh-cache – force a properties cache refresh */
 exports.refreshCache = async (req, res) => {
     try {
-        const properties = await exports.refreshPropertiesCache(CREDENTIALS_PATH);
+        const properties = await exports.refreshPropertiesCache();
         res.json({
             ok: true,
             count: properties.length,

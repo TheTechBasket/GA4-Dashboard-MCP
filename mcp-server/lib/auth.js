@@ -1,21 +1,15 @@
-// Builds Google client-library auth options.
-// Only credential source: GOOGLE_APPLICATION_CREDENTIALS pointing at a service-account .json file.
-function getAuthOptions() {
-	if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-		// Google client libraries pick this env var up automatically.
-		return {};
-	}
+// Credentials come from the root .env only (GA4_CLIENT_EMAIL, GA4_PRIVATE_KEY), via lib/credentials.js.
+const { clientOptions } = require("../../lib/credentials");
 
-	throw new Error(
-		"No GA credentials found. Set GOOGLE_APPLICATION_CREDENTIALS in mcp-server/.env to a service-account .json path (see .env.example).",
-	);
+function getAuthOptions() {
+	return clientOptions();
 }
 
-// For REST calls outside the generated GA4 clients (e.g. Indexing API) —
-// same credential strategy, but returns a token-bearing auth client.
+// For REST calls outside the generated GA4 clients (e.g. Indexing API):
+// same credentials, but the caller picks the scopes.
 function getScopedAuthClient(scopes) {
 	const { GoogleAuth } = require("google-auth-library");
-	const auth = new GoogleAuth({ ...getAuthOptions(), scopes });
+	const auth = new GoogleAuth({ credentials: clientOptions().credentials, scopes });
 	return auth.getClient();
 }
 

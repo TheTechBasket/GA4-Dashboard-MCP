@@ -53,6 +53,7 @@
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); openMenu(e.key === 'ArrowUp'); }
   });
   menu.addEventListener('click', (e) => {
+    if (e.target.closest('a.nb-mi')) { closeMenu(false); return; } // same-page hash links (/setup#ai)
     const b = e.target.closest('[data-set-theme]');
     if (!b) return;
     root.setAttribute('data-theme', b.dataset.setTheme);

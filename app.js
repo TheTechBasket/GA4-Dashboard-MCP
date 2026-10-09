@@ -89,10 +89,14 @@ app.engine('hbs', exphbs.engine({
 }));
 app.set('view engine', 'hbs');
 
-// ── First-run setup gate ──
-// If no GA4 service-account key is present, every route except /setup
-// renders the setup instructions instead of crashing on a missing credential.
-const { CREDENTIALS_PATH } = require('./controllers/ga4Service');
+// ── Setup gate ──
+// Credentials come from .env only (lib/credentials.js). Until GA4_CLIENT_EMAIL and GA4_PRIVATE_KEY
+// are set (or DEMO=1), pages redirect to /setup and /api/* answers 503 not_configured.
+const { isConfigured, resetClients } = require('./controllers/ga4Service');
+const setup = require('./lib/setupCheck');
+setup.onCredentialsChange(resetClients);
+const SETUP_DOC = require('./lib/setupDoc').loadSetupDoc();
+const { version: APP_VERSION } = require('./package.json');
 
 // Navbar: page title and active icon from the path (views/partials/navbar.hbs)
 const NAV_PAGES = { '/': 'Dashboard', '/globe': 'Globe', '/analytics': 'Analytics', '/setup': 'Setup' };
@@ -101,13 +105,36 @@ app.use((req, res, next) => {
 	res.locals.nav = { title, dash: title === 'Dashboard', globe: title === 'Globe', analytics: title === 'Analytics' };
 	next();
 });
+
+app.get('/healthz', (req, res) => res.json({ ok: true, version: APP_VERSION }));
+
+app.get('/api/setup/status', async (req, res) => {
+	res.set('Cache-Control', 'no-store');
+	try {
+		res.json(await setup.checkSetup());
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
+
 app.get('/setup', (req, res) => {
+	const mcp = SETUP_DOC.mcp.split('<project folder>').join(__dirname);
 	res.render('setup', {
-		head: { title: 'GA4 Dashboard & MCP · Setup', description: 'Connect a GA4 service account', image: '', url: '' },
+		head: { title: 'GA4 Dashboard & MCP · Setup', description: 'Connect Google Analytics and use it with AI', image: '', url: '' },
+		prompt: SETUP_DOC.prompt,
+		manual: SETUP_DOC.manual,
+		mcpPrompt: mcp,
+		psi: !!process.env.PSI_API_KEY,
+		gaAdminUrl: setup.GA4_ADMIN_URL,
+		projectDir: __dirname,
 	});
 });
+
 app.use((req, res, next) => {
-	if (req.path === '/setup' || CREDENTIALS_PATH) return next();
+	if (isConfigured()) return next();
+	setup.syncEnvFile(); // .env may have been written since startup
+	if (isConfigured()) return next();
+	if (req.path.startsWith('/api/') || req.method !== 'GET') return res.status(503).json({ error: 'not_configured' });
 	res.redirect('/setup');
 });
 
