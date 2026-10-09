@@ -30,12 +30,7 @@
 <meta name='description' content='{{description}}' />
 {{! // TODO: add some other meta tags if needed and some logic if any important value is not present then what to use }}
 <!--facebook share-->
-{{#if image}}
-    <meta property='og:image' content='{{image}}' />
-{{else}}
-    <meta property='og:image' content='https://cdn.quiztest.one/img/og.png' />
-
-{{/if}}
+<meta property='og:image' content='{{#if image}}{{image}}{{else}}/og.png{{/if}}' />
 <meta property='og:type' content='website' />
 {{#if url}}
     <meta property='og:url' content='{{url}}' />
@@ -45,21 +40,12 @@
 {{! site name }}
 <meta property='og:site_name' content='GA4 Dashboard' />
 <meta property='og:description' content='{{description}}' />
-{{! fb app id }}
-<meta property='fb:app_id' content='322736226628494' />
 
 <!--twitter：card share-->
 <meta name='twitter:title' content='{{title}}' />
 <meta name='twitter:description' content='{{description}}' />
-{{#if image}}
-    <meta name='twitter:image' content='{{image}}' />
-{{else}}
-    <meta
-        property='twitter:image'
-        content='https://cdn.quiztest.one/img/og.png'
-    />
-{{/if}}
-<meta name='twitter:card' content='summary' />
+<meta name='twitter:image' content='{{#if image}}{{image}}{{else}}/og.png{{/if}}' />
+<meta name='twitter:card' content='summary_large_image' />
 {{! <meta name="twitter:site" content="@flickr" /> }}
 
 {{! Inject scripts below }}
