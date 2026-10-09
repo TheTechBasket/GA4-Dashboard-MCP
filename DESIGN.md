@@ -228,6 +228,8 @@ Radii are sharp and small across the whole system: `2px` for controls and inputs
 ### Chart Fill (signature)
 The line charts (live traffic, trend sparklines) render an SVG line (`.ln`) over an area that is, by default, an **ordered dither**: horizontal mask-repeated bands (`.dz i`, CSS `mask-repeat`) clipped under the area polygon, rather than a gradient or flat fill (`html[data-fx="dither"]`). A flat semi-transparent fill (`.ar`, 14% opacity) is the fallback when dither is toggled off. This is a deliberate, user-approved ("dither looks really cool") signature texture, not a decorative default; it stays confined to chart area fills and must not spread to card backgrounds or other surfaces.
 
+**Map tokens (map-only exception, like the dither fill).** `/globe` defines `--sea --land --landline --grat --space --halo --indline` as plain values in `views/globe.hbs` (the canvas engine reads them with `getComputedStyle`). Minimal is calm neutral; Outdoors is vivid (sea `#4a9fd8`/`#0b3a5e`, land `#9cd08a`/`#24502f`), and the MapLibre globe or Outdoors sits on a `#05070d` space backdrop. Avatar markers carry a 2px white ring. These values stay inside the map stage and never reach panels or other pages.
+
 ## Do's and Don'ts
 
 ### Do:

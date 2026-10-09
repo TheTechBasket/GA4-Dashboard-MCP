@@ -10,6 +10,9 @@ const {
 } = require("./analyticsRecipes");
 const { runSafeHistoricalReport, runSafeRealtimeReport, CREDENTIALS_PATH } = require("./ga4Service");
 const { stripSensitiveGlobeUsersPayload } = require("./privacy");
+const { buildGlobeUsersPayload, refreshInfo } = require("./globeUsers");
+const { getFavicon } = require("./favicons");
+const { letterTile } = require("../public/js/letterTile");
 const { cacheGet, cacheSet, cacheCleanup, shouldBypass } = require("./reportCache");
 
 /** ?fresh=1 skips the cache read (the result is still cached), at most once per minute per key. */
@@ -482,6 +485,28 @@ exports.realtimeAllApi = async (req, res) => {
 };
 
 /** GET /api/quota – returns the latest quota snapshot from the last realtime fetch */
+/** Site favicon for the globe: domain from the properties cache (GA4 dataStreams defaultUri). */
+exports.favicon = async (req, res) => {
+    const id = req.params.propertyId;
+    if (!/^\d+$/.test(id)) return res.sendStatus(400);
+    const cache = await getCachedProperties();
+    const prop = cache?.properties?.find((p) => p.id === id);
+    if (!prop) return res.sendStatus(404);
+    const file = await getFavicon(id, prop.url).catch(() => null);
+    if (!file) {
+        // No icon found: same letter tile the client draws, so the <img> never errors.
+        const { letter, color } = letterTile(prop.site, Number(id));
+        res.set({ "Cache-Control": "max-age=3600", "X-Content-Type-Options": "nosniff" }).type("image/svg+xml");
+        return res.send(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><rect width="20" height="20" fill="${color}"/><text x="10" y="14.5" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">${letter}</text></svg>`);
+    }
+    res.set({
+        "Cache-Control": "max-age=86400",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+        "X-Content-Type-Options": "nosniff",
+    });
+    res.sendFile(file);
+};
+
 exports.quotaData = (req, res) => {
     if (!latestQuota) {
         return res.json({ ok: false, quota: null, message: "No quota data yet. Reload the dashboard first." });
@@ -691,14 +716,20 @@ async function fetchGlobeCountryData(properties) {
 
 const GLOBE_USERS_CACHE_PATH = path.join(CACHE_DIR, "globe_users.json");
 const GLOBE_USERS_TTL_SEC = 30;
+const GLOBE_USERS_MAX_AGE_SEC = 300;
 
-async function getCachedGlobeUsers() {
+/** Last propertyQuota per property and the measured token cost of one globe poll per property. */
+const globeQuotas = new Map();
+const globeCosts = new Map();
+let globeFetchInFlight = null;
+
+async function getCachedGlobeUsers(maxAgeSec = GLOBE_USERS_TTL_SEC) {
     try {
         const raw  = await fs.readFile(GLOBE_USERS_CACHE_PATH, "utf8");
         const parsed = JSON.parse(raw);
         if (!parsed?.fetchedAt) return null;
         const ageMs = Date.now() - new Date(parsed.fetchedAt).getTime();
-        if (ageMs > GLOBE_USERS_TTL_SEC * 1000) return null;
+        if (ageMs > maxAgeSec * 1000) return null;
         return parsed;
     } catch { return null; }
 }
@@ -708,114 +739,90 @@ async function saveGlobeUsersToCache(payload) {
     await fs.writeFile(GLOBE_USERS_CACHE_PATH, JSON.stringify(payload, null, 2));
 }
 
-/** Simple deterministic color from a string seed */
-function seedColor(str) {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
-    const hue = h % 360;
-    return `hsl(${hue},65%,55%)`;
-}
-
 async function fetchGlobeUsersData(properties) {
+    const minuteRanges = [{ startMinutesAgo: 29, endMinutesAgo: 0 }];
     const results = await Promise.all(
         properties.map(async (prop) => {
-            const response = await runSafeRealtimeReport({
-                propertyId: prop.id,
-                dimensions: [
-                    { name: "city" },
-                    { name: "country" },
-                    { name: "countryId" },
-                    { name: "deviceCategory" },
-                ],
-                metrics: [{ name: "activeUsers" }],
-                minuteRanges: [{ startMinutesAgo: 29, endMinutesAgo: 0 }],
-                // NOTE: city×country×countryId×device is a high-cardinality breakdown.
-                // The default limit (50) truncated rows for busier properties, which
-                // silently undercounted totalActiveUsers vs the homepage's per-stream
-                // total (no such cap). Raised well past any realistic concurrent-user
-                // combo count so the globe's total matches the homepage's.
-                limit: 10000,
-            });
-            return { prop, rows: response.rows || [] };
+            const users = await runSafeRealtimeReport({
+                    propertyId: prop.id,
+                    dimensions: [
+                        // Realtime allows 4 dimensions: the country name comes from countryId in buildGlobeUsersPayload.
+                        { name: "city" }, { name: "countryId" },
+                        { name: "deviceCategory" }, { name: "platform" },
+                    ],
+                    metrics: [{ name: "activeUsers" }, { name: "screenPageViews" }, { name: "keyEvents" }],
+                    fallbackMetrics: [{ name: "activeUsers" }],
+                    minuteRanges,
+                    // High-cardinality breakdown: the default limit (50) undercounted busy properties.
+                    limit: 10000,
+                });
+            // Each realtime call costs ~40 tokens even when empty: skip the feed query for idle properties.
+            const events = users.ok && users.rows?.length ? await runSafeRealtimeReport({
+                    propertyId: prop.id,
+                    dimensions: [
+                        // Realtime rejects unifiedScreenName with eventName, so the feed is page views per minute.
+                        { name: "city" }, { name: "unifiedScreenName" }, { name: "minutesAgo" },
+                    ],
+                    metrics: [{ name: "screenPageViews" }, { name: "keyEvents" }],
+                    fallbackMetrics: [{ name: "screenPageViews" }],
+                    minuteRanges,
+                    limit: 10000,
+                }) : { ok: true, rows: [], quota: null };
+            return { prop, users, events };
         })
     );
 
-    // city key → aggregate entry
-    const cityMap    = new Map();
-    const countryMap = new Map();
-    const deviceMap  = new Map();
-    const propMap    = new Map(); // per-property active users
-    let   rawTotal   = 0;         // all users regardless of coordinate availability
-
-    for (const { prop, rows } of results) {
-        for (const row of rows) {
-            const city    = row.dimensionValues?.[0]?.value ?? "(not set)";
-            const country = row.dimensionValues?.[1]?.value ?? "Unknown";
-            const ctryId  = row.dimensionValues?.[2]?.value ?? "ZZ";
-            const device  = row.dimensionValues?.[3]?.value ?? "desktop";
-            const users   = parseInt(row.metricValues?.[0]?.value || "0", 10);
-            if (!users) continue;
-            rawTotal += users;
-
-            // City aggregation
-            const coords = getCityCoords(city);
-            if (coords && city !== "(not set)") {
-                const key = `${city}||${ctryId}`;
-                if (!cityMap.has(key)) {
-                    cityMap.set(key, {
-                        city, country, countryId: ctryId,
-                        lat: coords[0], lng: coords[1],
-                        count: 0,
-                        device,
-                        color: seedColor(`${city}${ctryId}`),
-                        prop: prop.site,
-                    });
-                }
-                cityMap.get(key).count += users;
+    let feedFailures = 0;
+    for (const { prop, users, events } of results) {
+        let cost = 0;
+        for (const r of [users, events]) {
+            if (r.quota) {
+                globeQuotas.set(prop.id, r.quota);
+                // The installed @google-analytics/data client omits tokensPerProjectPerHour: fall back to tokensPerHour.
+                cost += Number((r.quota.tokensPerProjectPerHour || r.quota.tokensPerHour)?.consumed) || 0;
             }
-
-            // Country aggregation
-            if (!countryMap.has(ctryId)) countryMap.set(ctryId, { name: country, id: ctryId, count: 0 });
-            countryMap.get(ctryId).count += users;
-
-            // Device aggregation
-            const devLabel = device.charAt(0).toUpperCase() + device.slice(1);
-            deviceMap.set(devLabel, (deviceMap.get(devLabel) || 0) + users);
-
-            // Property aggregation
-            if (!propMap.has(prop.site)) {
-                propMap.set(prop.site, { site: prop.site, domain: prop.domain || null, url: prop.url || null, count: 0 });
-            }
-            propMap.get(prop.site).count += users;
         }
+        if (cost > 0) globeCosts.set(prop.id, cost);
+        if (!events.ok && !events.isPermissionDenied) feedFailures++;
     }
+    if (feedFailures) console.warn(`[globe-users] event feed query failed for ${feedFailures} properties, feed is partial`);
 
-    const users       = [...cityMap.values()].sort((a, b) => b.count - a.count);
-    const cities      = users.slice(0, 8).map(u => ({ city: u.city, country: u.country, id: u.countryId, count: u.count }));
-    const countries   = [...countryMap.values()].sort((a, b) => b.count - a.count).slice(0, 10);
-    const devices     = [...deviceMap.entries()].map(([name, count]) => ({ name, count }))
-                          .sort((a, b) => b.count - a.count);
-    const propsList   = [...propMap.values()].sort((a, b) => b.count - a.count);
-
-    return { users, cities, countries, devices, properties: propsList, totalActiveUsers: rawTotal };
+    return buildGlobeUsersPayload(
+        results.map(({ prop, users }) => ({ prop, rows: users.rows })),
+        results.map(({ prop, events }) => ({ prop, rows: events.ok ? events.rows : [] })),
+        getCityCoords,
+    );
 }
 
-/** GET /api/globe-users – city-level user data for avatar map */
+/** GET /api/globe-users?maxAge=N – city-level users, event feed, quota-aware refresh (N seconds, 0..300) */
 exports.globeUsers = async (req, res) => {
     try {
-        const cached = await getCachedGlobeUsers();
-        if (cached) return res.json(stripSensitiveGlobeUsersPayload(cached));
+        const asked = Number.parseInt(req.query.maxAge, 10);
+        let maxAge = Number.isFinite(asked) ? Math.min(GLOBE_USERS_MAX_AGE_SEC, Math.max(0, asked)) : GLOBE_USERS_TTL_SEC;
+        const before = refreshInfo(globeQuotas, globeCosts);
+        if (before?.throttled) maxAge = GLOBE_USERS_MAX_AGE_SEC;
 
-        const propCache  = await getCachedProperties();
-        const properties = propCache?.properties ?? [];
+        const send = (payload) => {
+            const refresh = refreshInfo(globeQuotas, globeCosts) || payload.refresh || null;
+            res.json(stripSensitiveGlobeUsersPayload({ ...payload, refresh }));
+        };
 
-        const payload = await fetchGlobeUsersData(properties);
-        payload.fetchedAt = new Date().toISOString();
+        const cached = await getCachedGlobeUsers(maxAge);
+        if (cached) return send(cached);
 
-        const publicPayload = stripSensitiveGlobeUsersPayload(payload);
-
-        await saveGlobeUsersToCache(publicPayload);
-        res.json(publicPayload);
+        if (!globeFetchInFlight) {
+            globeFetchInFlight = (async () => {
+                const propCache  = await getCachedProperties();
+                const properties = propCache?.properties ?? [];
+                const payload = await fetchGlobeUsersData(properties);
+                payload.fetchedAt = new Date().toISOString();
+                payload.refresh = refreshInfo(globeQuotas, globeCosts);
+                const publicPayload = stripSensitiveGlobeUsersPayload(payload);
+                await saveGlobeUsersToCache(publicPayload);
+                return publicPayload;
+            })().finally(() => { globeFetchInFlight = null; });
+        }
+        send(await globeFetchInFlight);
     } catch (err) {
         console.error("[globe-users] Fatal:", err.message);
         res.status(500).json({ error: err.message });
@@ -984,16 +991,9 @@ exports.analyticsCard = async (req, res) => {
             dimensionHeaders: cfg.dimensions,
             metricHeaders,
             currencyCode,
+            fetchedAt: Date.now(),
         };
 
-        // Cache asynchronously (don't block response)
-        cacheSet("card", cacheKey, payload).catch(() => {});
-
-        res.json(payload);
-    } catch (err) {
-            fetchedAt: Date.now(),
-        console.error(`[analytics-card] ${type}:`, err.message);
-        res.status(500).json({ error: err.message });
         if (prevResponse.ok) {
             const prevRows = (prevResponse.rows || []).map(row => ({
                 dims:    row.dimensionValues.map(d => d.value),
@@ -1007,6 +1007,13 @@ exports.analyticsCard = async (req, res) => {
             console.warn(`[analytics-card] ${type} previous period:`, prevResponse.error);
         }
 
+        // Cache asynchronously (don't block response)
+        cacheSet("card", cacheKey, payload).catch(() => {});
+
+        res.json(payload);
+    } catch (err) {
+        console.error(`[analytics-card] ${type}:`, err.message);
+        res.status(500).json({ error: err.message });
     }
 };
 

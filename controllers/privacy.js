@@ -29,6 +29,9 @@ function stripSensitiveGlobeUsersPayload(payload) {
     users: Array.isArray(payload.users)
       ? payload.users.map(({ url, ...user }) => user)
       : payload.users,
+    feed: Array.isArray(payload.feed)
+      ? payload.feed.map(({ url, ...row }) => row)
+      : payload.feed,
     properties: Array.isArray(payload.properties)
       ? payload.properties.map(({ url, domain, ...property }) => ({
           ...property,

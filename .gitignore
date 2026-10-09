@@ -175,3 +175,7 @@ ga4dataapi-*.json
 
 ### Local planning notes – not part of the shipped project ###
 plans/
+
+# Runtime caches (favicons, globe state) and local browser test output
+.data/
+.playwright-mcp/

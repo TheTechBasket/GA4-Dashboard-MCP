@@ -1,460 +1,235 @@
+<link rel="stylesheet" href="/css/panel.css" />
 <style>
-  /* ─── Globe Design Tokens (Zed / DESIGN.md Specification) ─── */
-  :root {
-    --g-bg: #e5e7eb;
-    --g-panel: rgba(255, 255, 255, 0.92);
-    --g-card: rgba(244, 244, 242, 0.96);
-    --g-border: #cccfd3;
-    --g-text: #3a3d43;
-    --g-muted: #5d636f;
-    --g-accent: #1348dc;
-    --g-signal: #2b7fff;
-    --g-green: #059669;
-    --g-mono: 'Zed Mono', 'JetBrains Mono', ui-monospace, monospace;
-    --g-serif: 'Plex Serif', Georgia, serif;
-    --g-sans: 'Inter', system-ui, sans-serif;
+  /* Map-only tokens (DESIGN.md exception, like the dither fill). Plain values, not light-dark(): the canvas engine reads them with getComputedStyle. */
+  :root { --sea: #e4e5ec; --land: #ffffff; --landline: #d4d4dc; --grat: rgba(24,24,27,.05); --space: #f7f7f9; --halo: rgba(79,70,229,.16); --indline: #a8a8b4; }
+  :root[data-theme="dark"] { --sea: #0f0f13; --land: #1d1d23; --landline: #33333c; --grat: rgba(255,255,255,.04); --space: #060608; --halo: rgba(129,140,248,.22); --indline: #5a5a66; }
+  :root[data-map="outdoors"] { --sea: #4a9fd8; --land: #9cd08a; --landline: #6f9f5f; --grat: rgba(30,80,110,.08); --space: #eef4f7; --halo: rgba(70,150,200,.35); --indline: #7d7488; }
+  :root[data-theme="dark"][data-map="outdoors"] { --sea: #0b3a5e; --land: #24502f; --landline: #3a6d47; --grat: rgba(160,210,240,.05); --space: #04080b; --halo: rgba(90,170,230,.25); --indline: #7d7488; }
+
+  /* Vivid looks (MapLibre globe, Outdoors): dark space backdrop and a stronger blue halo in both themes */
+  :root[data-gspace="dark"] { --space: #05070d; --halo: rgba(74,159,216,.55); }
+
+  body { overflow: hidden; }
+  #appFooter, .dash-foot, body > .hidden { display: none !important; }
+  .container.mx-auto.p-5.mb-auto { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+
+  .gstage { position: fixed; inset: 52px 0 0 0; background: var(--space); overflow: clip; touch-action: none; font: 400 14px/1.5 var(--font); color: var(--text); }
+  .gstage * { box-sizing: border-box; }
+  .gstage .num { font-variant-numeric: tabular-nums; }
+  .gstage :focus-visible { outline: 2px solid var(--accent-fg); outline-offset: 2px; }
+  .gmap, .gmap > * { position: absolute; inset: 0; }
+  .gmap canvas { width: 100%; height: 100%; cursor: grab; }
+  .gmap .maplibregl-canvas { outline: none; }
+  .attr { position: absolute; left: 12px; bottom: 8px; z-index: 2; font-size: 10.5px; color: var(--text-3); background: var(--surface); padding: 1px 6px; border-radius: var(--r); }
+  .attr a { color: inherit; }
+  .marks { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+  .gpop { position: absolute; z-index: 2; background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--r-lg); box-shadow: var(--pop-shadow); }
+
+  /* Summary panel */
+  .gsum { top: 12px; left: 12px; width: min(340px, calc(100% - 24px)); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100% - 24px); overflow: auto; }
+  .tools { display: flex; gap: 2px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .ib { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: var(--r); background: transparent; color: var(--text-2); cursor: pointer; padding: 0; transition: background-color .15s, color .15s; }
+  .ib:hover { background: var(--surface-2); color: var(--text); }
+  .ib[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-fg); }
+  .ib svg, .gico svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .ghead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .ghead b { font-size: 28px; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
+  .ghead > span { color: var(--text-2); font-size: 13px; }
+  .ghead .key { color: var(--good); }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; animation: gpulse 2s ease-out infinite; }
+  @keyframes gpulse { 0% { opacity: 1; } 70% { opacity: .35; } 100% { opacity: 1; } }
+  .grow { display: flex; flex-direction: column; gap: 4px; }
+  .grow h3 { font-size: 12px; font-weight: 500; color: var(--text-3); margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; max-height: 52px; overflow: hidden; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 1px solid var(--border-2); border-radius: var(--r); background: var(--surface); font-size: 12px; color: var(--text); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .chip .k { color: var(--text-3); font-size: 11px; font-weight: 500; }
+  .chip .v { font-weight: 600; }
+  .rf { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 8px; font-size: 12px; color: var(--text-3); }
+  .rf select { height: 26px; border: 1px solid var(--border-2); border-radius: var(--r); background: var(--surface); color: var(--text); font: 500 12px var(--font); padding: 0 4px; }
+  .rf .cap { flex-basis: 100%; }
+  .rf .warn { color: var(--warn); }
+  .lw { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; cursor: pointer; color: var(--text-2); }
+  .lw input { accent-color: var(--accent); margin: 0; }
+
+  /* Event feed */
+  .gbr { position: absolute; right: 12px; bottom: 12px; z-index: 2; width: min(420px, calc(100% - 24px)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+  .gbr > * { pointer-events: auto; }
+  .gbr .gfeed { position: static; width: 100%; }
+  .gfeed { max-height: 212px; display: flex; flex-direction: column; }
+
+  /* Zoom control: DESIGN.md .btn (surface, border-2 stroke, 2px radius, 32px), stacked */
+  .gzoom { display: flex; flex-direction: column; }
+  .zb { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid var(--border-2); border-radius: var(--r); background: var(--surface); color: var(--text); cursor: pointer; transition: background-color .15s, transform .12s var(--ease-out); }
+  .zb:first-child { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .zb:last-child { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+  .zb:hover { background: var(--surface-2); }
+  .zb:active { transform: scale(.97); }
+  .zb:disabled { opacity: .5; pointer-events: none; }
+  .zb svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; }
+
+  /* Collapsible summary panel: toolbar + live count only */
+  .gmin { margin-left: auto; }
+  .gmin svg { transition: transform .15s var(--ease-out); }
+  .gsum[data-min] .gmin svg { transform: rotate(180deg); }
+  .gsum[data-min] > :not(.tools):not(.ghead) { display: none; }
+  .gnote { margin: 0; font-size: 11.5px; color: var(--text-3); }
+  .gfeed[hidden] { display: none; }
+  .feed-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-3); }
+  .feed-h b { color: var(--text); font-weight: 600; font-size: 13px; }
+  .feed-h button { border: 0; background: none; color: var(--accent-fg); font: 500 12px var(--font); cursor: pointer; padding: 0; }
+  .gfeed ul { list-style: none; margin: 0; padding: 4px 0; overflow: auto; }
+  .gfeed li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 5px 12px; font-size: 12.5px; line-height: 1.4; }
+  .gfeed li.empty { display: block; color: var(--text-3); }
+  .gfeed li .t { color: var(--text-3); font-size: 11px; white-space: nowrap; }
+  .gfeed li em { font-style: normal; color: var(--text-2); }
+  .gfeed li .key { color: var(--good); font-weight: 500; }
+  .gfeed li.new { animation: gin .18s var(--ease-out); }
+  @keyframes gin { from { opacity: 0; transform: translateY(-4px); } }
+  .av { width: 22px; height: 22px; border-radius: 50%; background: var(--surface-3); overflow: hidden; display: grid; place-items: center; font-size: 10px; font-weight: 600; color: var(--text-2); flex: none; }
+  .av img { width: 100%; height: 100%; display: block; }
+
+  /* Avatar markers */
+  .mk { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; padding: 0; width: var(--s); height: var(--s); border-radius: 50%; background: var(--surface); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); transition: transform .15s var(--ease-out); display: grid; place-items: center; font: 600 10px var(--font); color: var(--text-2); }
+  .mk:hover, .mk.sel { z-index: 999 !important; transform: translate(-50%, -50%) scale(1.15); }
+  .mk.sel { border-color: var(--accent); }
+  .mk img { width: 100%; height: 100%; border-radius: 50%; display: block; }
+  .mk.grp { background: none; border: 0; box-shadow: none; width: calc(var(--s) + var(--n) * 11px); }
+  .mk.grp .f { position: absolute; top: 0; left: var(--o); width: var(--s); height: var(--s); border-radius: 50%; overflow: hidden; background: var(--surface); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); display: grid; place-items: center; }
+  .mk.grp.sel .f:first-child { border-color: var(--accent); }
+  #gmarks .mk { animation: gfade .12s linear; }
+  @keyframes gfade { from { opacity: 0; } }
+  .mk:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: 2px; }
+
+  /* Card shell (shared by the city card and the group list) */
+  .gcard { z-index: 3; width: 280px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .gcard[hidden] { display: none; }
+  .gcard .x { position: absolute; right: 6px; top: 6px; }
+  .gcard-t { display: flex; gap: 10px; align-items: center; padding-right: 24px; }
+  .gcard-t .av { width: 36px; height: 36px; }
+  .gcard-t b { font-size: 15px; font-weight: 600; display: block; }
+  .gcard-t > div > span { font-size: 12px; color: var(--text-3); }
+
+  /* Group list card */
+  .glist { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+  .glist button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 4px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: var(--r); }
+  .glist button:hover { background: var(--surface-2); }
+  .glist button > span:nth-child(2) { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* City card body (variant A, stacked faces): renderCityCard() in globe.js. Swap this block and that function together. */
+  .gcard.city { width: 300px; padding: 0; gap: 0; }
+  .gcity .ch { display: flex; align-items: center; gap: 10px; padding: 12px 36px 12px 12px; }
+  .gcity .flag { width: 24px; height: 16px; border-radius: 2px; flex: none; box-shadow: 0 0 0 1px var(--border-2); display: block; object-fit: cover; }
+  .gcity .ct { flex: 1; min-width: 0; }
+  .gcity .ct b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gcity .ct span { display: block; font-size: 12px; color: var(--text-3); }
+  .gcity .stack { display: flex; align-items: center; }
+  .gcity .stack .fav + .fav { margin-left: -6px; }
+  .gcity .stack .more { margin-left: 4px; font-size: 12px; color: var(--text-3); }
+  .gcity .cb { border-top: 1px solid var(--border); padding: 12px; display: grid; gap: 10px; }
+  .gcity .kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .gcity .kv div { display: grid; }
+  .gcity .kv small { font-size: 12px; color: var(--text-3); }
+  .gcity .kv b { font-weight: 600; }
+  .gcity .page { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gcity .tw { max-height: 190px; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; }
+  .gcity .tbl th:last-child, .gcity .tbl td:last-child { padding-right: 4px; }
+  .gcity .tbl { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+  .gcity .tbl th { font-weight: 500; color: var(--text-3); text-align: right; padding: 4px 0; position: sticky; top: 0; background: var(--surface); width: 52px; }
+  .gcity .tbl th:first-child { width: auto; }
+  .gcity .tbl th:first-child, .gcity .tbl td:first-child { text-align: left; }
+  .gcity .tbl td { padding: 6px 0; border-top: 1px solid var(--border); text-align: right; }
+  .gcity .site { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .gcity .site > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gcity .foot { font-size: 12px; color: var(--text-3); }
+
+  /* Site faces: favicon or letter tile */
+  .fav { width: 20px; height: 20px; border-radius: 2px; flex: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; background: #fff; object-fit: contain; box-shadow: 0 0 0 2px var(--surface); }
+  .chip .fav { width: 14px; height: 14px; font-size: 9px; box-shadow: none; }
+  .gstage[data-av="sites"] .mk:not(.grp), .gstage[data-av="sites"] .mk.grp .f { background: #fff; }
+  .mk .fav { width: 62%; height: 62%; border-radius: 2px; box-shadow: none; }
+  .mk .fav.tile { width: 100%; height: 100%; border-radius: 50%; font-size: 12px; }
+
+  .gerr { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); font-size: 13px; }
+
+  body.privacy-blur .gstage [data-privacy] { filter: blur(6px); user-select: none; }
+
+  @media (max-width: 860px) {
+    .gsum { gap: 8px; }
+    .gsum .grow:nth-of-type(n+2), .rf .cap { display: none; }
+    .chips { max-height: 24px; }
+    .gbr { left: 0; right: 0; bottom: 0; width: 100%; align-items: flex-start; }
+    .gzoom { margin-left: 12px; }
+    .gfeed { max-height: 150px; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+    .gbr:has(.gfeed[hidden]) { bottom: 12px; }
+    .gcard { left: 0 !important; right: 0; bottom: 0; top: auto !important; width: 100%; border-radius: var(--r-lg) var(--r-lg) 0 0; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+    .gcard.city { width: 100%; padding: 0 0 env(safe-area-inset-bottom); }
+    .attr { left: auto; right: 8px; bottom: auto; top: 8px; }
   }
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--g-bg) !important;
-    color: var(--g-text);
-    font-family: var(--g-sans);
-    overflow: hidden;
-    background-image: radial-gradient(#cccfd3 1px, transparent 1px) !important;
-    background-size: 8px 8px !important;
+  @media (hover: none), (pointer: coarse) {
+    .ib { width: 40px; height: 40px; }
+    .rf select { height: 36px; }
+    .zb { width: 44px; height: 44px; }
   }
-
-  /* Nav from the shared layout */
-  nav { position: relative; z-index: 200; }
-
-  /* Kill layout container padding so the globe fills the screen */
-  .container.mx-auto.p-5.mb-auto {
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-  }
-
-  /* Hide footer and debug responsive from main layout */
-  #appFooter,
-  .hidden,
-  .dash-foot { display: none !important; }
-
-  #globe-canvas {
-    position: fixed;
-    inset: 0;
-    width: 100vw !important;
-    height: 100vh !important;
-  }
-
-  /* Loading Overlay */
-  #globe-loading {
-    position: fixed; inset: 0; background: var(--g-bg);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    z-index: 300; gap: 16px; transition: opacity 500ms ease;
-  }
-  .gl-spinner {
-    width: 40px; height: 40px;
-    border: 2px solid var(--g-border); border-top-color: var(--g-signal);
-    border-radius: 50%; animation: spin 800ms linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .gl-load-text { font-family: var(--g-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--g-muted); }
-
-  /* Top Control & HUD Header */
-  .globe-hud-bar {
-    position: fixed; top: 76px; left: 24px; right: 24px;
-    display: flex; align-items: center; justify-content: space-between;
-    z-index: 100; pointer-events: none;
-  }
-
-  .hud-title-box {
-    background: var(--g-panel); border: 1px solid var(--g-border);
-    border-radius: 2px; padding: 12px 18px; pointer-events: auto;
-    box-shadow: rgba(111, 123, 144, 0.1) 0 -2px 0 0 inset;
-  }
-  .hud-title { font-family: var(--g-serif); font-size: 20px; font-weight: 340; color: var(--g-accent); letter-spacing: -0.02em; }
-  .hud-sub { font-family: var(--g-mono); font-size: 10px; color: var(--g-muted); margin-top: 2px; letter-spacing: 0.05em; }
-
-  /* Left Sidebar — Live Rankings & Control Panel */
-  #panel-left {
-    position: fixed; left: 24px; top: 156px; width: 280px;
-    background: var(--g-panel); border: 1px solid var(--g-border);
-    border-radius: 2px;
-    overflow: hidden; z-index: 100; max-height: calc(100vh - 270px); overflow-y: auto;
-    box-shadow: rgba(111, 123, 144, 0.1) 0 -2px 0 0 inset;
-  }
-  #panel-left::-webkit-scrollbar { width: 3px; }
-  #panel-left::-webkit-scrollbar-thumb { background: var(--g-border); border-radius: 2px; }
-
-  .pl-header {
-    padding: 16px 18px; border-bottom: 1px solid var(--g-border);
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .pl-total-wrap { display: flex; align-items: baseline; gap: 10px; }
-  .pl-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--g-green); animation: pulse-dot 1.8s ease-in-out infinite; }
-  @keyframes pulse-dot { 0%,100% { box-shadow: 0 0 0 0 rgba(5,150,105,.4); } 50% { box-shadow: 0 0 0 6px rgba(5,150,105,0); } }
-  .pl-total { font-family: var(--g-mono); font-size: 32px; font-weight: 700; color: var(--g-accent); letter-spacing: -0.02em; }
-  .pl-total-label { font-family: var(--g-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--g-muted); }
-
-  .pl-section { padding: 12px 18px; border-bottom: 1px solid var(--g-border); }
-  .pl-section:last-child { border-bottom: none; }
-  .pl-section-title { font-family: var(--g-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--g-muted); margin-bottom: 8px; }
-
-  .pl-row {
-    display: flex; align-items: center; gap: 10px; padding: 5px 6px; border-radius: 2px;
-    font-size: 12px; color: var(--g-text); cursor: pointer; transition: background 150ms ease;
-  }
-  .pl-row:hover { background: #e6effe; }
-  .pl-row-icon { font-size: 14px; flex-shrink: 0; }
-  .pl-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-  .pl-row-count { font-family: var(--g-mono); font-size: 11px; color: var(--g-green); font-weight: 700; flex-shrink: 0; }
-  .pl-row-bar { height: 2px; background: var(--g-signal); border-radius: 1px; transition: width 300ms ease; margin-top: 3px; }
-
-  /* Right floating controls */
-  #panel-controls {
-    position: fixed; right: 24px; top: 156px; display: flex; flex-direction: column; gap: 8px; z-index: 100;
-  }
-  .ctrl-btn {
-    width: 40px; height: 40px; border-radius: 2px;
-    background: var(--g-panel); border: 1px solid var(--g-border);
-    color: var(--g-muted); display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 150ms ease; font-family: var(--g-mono); font-size: 11px;
-  }
-  .ctrl-btn:hover { color: var(--g-accent); border-color: var(--g-signal); background: var(--g-card); }
-  .ctrl-btn.active { color: var(--g-accent); border-color: var(--g-signal); background: #e6effe; }
-
-  /* Bottom Live Feed Stream Ticker */
-  #panel-feed {
-    position: fixed; bottom: 20px; left: 320px; right: 24px;
-    background: var(--g-panel); border: 1px solid var(--g-border); border-radius: 2px;
-    z-index: 100; padding: 10px 12px; min-height: 52px; max-height: 72px; overflow: hidden;
-    box-shadow: rgba(111, 123, 144, 0.1) 0 -2px 0 0 inset;
-  }
-  .feed-header { font-family: var(--g-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--g-muted); margin-bottom: 6px; }
-  .feed-list { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
-  .feed-list::-webkit-scrollbar { height: 3px; }
-  .feed-list::-webkit-scrollbar-thumb { background: var(--g-border); border-radius: 2px; }
-
-  .feed-card {
-    background: var(--g-card); border: 1px solid var(--g-border);
-    border-radius: 2px; padding: 6px 12px; display: flex; align-items: center; gap: 10px;
-    flex-shrink: 0; font-size: 11px; white-space: nowrap;
-  }
-  .feed-flag { font-size: 14px; }
-  .feed-city { font-weight: 600; color: var(--g-text); }
-  .feed-prop { color: var(--g-muted); font-size: 10px; }
-  .feed-badge { font-family: var(--g-mono); font-size: 10px; background: #e6effe; color: var(--g-accent); padding: 1px 6px; border-radius: 2px; }
-
-  /* Interactive Markers */
-  .globe-marker { position: relative; cursor: pointer; }
-  .globe-marker-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--g-signal); border: 2px solid #ffffff; box-shadow: 0 0 8px rgba(43,127,255,.35); }
-  .globe-marker-ring { position: absolute; inset: -6px; border-radius: 50%; border: 1.5px solid var(--g-signal); opacity: 0.6; animation: markerRing 2s ease-out infinite; }
-  @keyframes markerRing { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.2); opacity: 0; } }
-
-  /* Privacy blur rules for URLs, domains, and properties */
-  body.privacy-blur .pl-row-name,
-  body.privacy-blur .feed-city,
-  body.privacy-blur .feed-prop,
-  body.privacy-blur [data-privacy],
-  body.privacy-blur [data-domain] {
-    filter: blur(8px) !important;
-    user-select: none !important;
-    pointer-events: none !important;
-    opacity: 0.35 !important;
-  }
-  body.privacy-blur .pl-row-name:hover,
-  body.privacy-blur .feed-city:hover {
-    filter: blur(8px) !important;
-  }
-
-  @media (max-width: 820px) {
-    .globe-hud-bar { top: 64px; left: 12px; right: 12px; }
-    #panel-left {
-      left: 12px; right: 12px; top: auto; bottom: 118px; width: auto;
-      max-height: 38vh;
-    }
-    #panel-controls { right: 12px; top: 128px; }
-    #panel-feed { left: 12px; right: 12px; bottom: 12px; max-height: 72px; }
-    .hud-title { font-size: 17px; }
+  @media (prefers-reduced-motion: reduce) {
+    .gstage *, .gstage *::before, .gstage *::after { animation: none !important; transition: none !important; }
   }
 </style>
 
-<div id="globe-loading">
-  <div class="gl-spinner"></div>
-  <p class="gl-load-text">INITIALIZING 3D GLOBE ENGINE…</p>
-</div>
+<div id="gstage" class="gstage">
+  <div class="gmap" id="gmap" role="img" aria-label="Map of live visitors"></div>
+  <div class="attr" id="gattr" hidden>&copy; <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
+  <div class="marks" id="gmarks"></div>
 
-<div id="globe-canvas"></div>
-
-<!-- HUD Header -->
-<div class="globe-hud-bar">
-  <div class="hud-title-box">
-    <div class="hud-title">Live Visitor Globe</div>
-    <div class="hud-sub">REAL-TIME ACTIVE USER LOCATIONS</div>
-  </div>
-</div>
-
-<!-- Left Leaderboard & Stats Panel -->
-<div id="panel-left">
-  <div class="pl-header">
-    <div class="pl-total-wrap">
-      <div class="pl-live-dot"></div>
-      <div class="pl-total" id="glTotalUsers">0</div>
+  <section class="gpop gsum" aria-label="Live summary">
+    <div class="tools" role="toolbar" aria-label="Map controls">
+      <button type="button" class="ib" data-t="proj" data-icon="map" aria-pressed="false" title="Switch to 2D map" aria-label="Switch to 2D map"></button>
+      <button type="button" class="ib" data-t="style" data-icon="leaf" aria-pressed="false" title="Map style: Minimal (switch to Outdoors)" aria-label="Map style"></button>
+      <button type="button" class="ib" data-t="theme" data-icon="sun" title="Light or dark map" aria-label="Light or dark map"></button>
+      <button type="button" class="ib" data-t="feed" data-icon="list" aria-pressed="true" title="Show event feed (M)" aria-label="Show event feed (M)"></button>
+      <button type="button" class="ib" id="privacyBtn" data-icon="eyeoff" aria-pressed="false" title="Hide names and domains (P)" aria-label="Hide names and domains"></button>
+      <button type="button" class="ib" data-t="refresh" data-icon="refresh" title="Refresh now" aria-label="Refresh now"></button>
+      <button type="button" class="ib" data-t="full" data-icon="full" title="Fullscreen" aria-label="Fullscreen"></button>
+      <button type="button" class="ib gmin" data-t="panel" data-icon="chev" aria-expanded="true" title="Collapse panel" aria-label="Collapse panel"></button>
     </div>
-    <div class="pl-total-label">Active Users</div>
+    <div class="ghead"><span class="live-dot" aria-hidden="true"></span><b class="num" id="gTotal">0</b><span id="gSub">Loading live visitors</span></div>
+    <div id="gRows"></div>
+    <div class="rf">
+      <label for="rfSel">Refresh</label>
+      <select id="rfSel">
+        <option value="auto">Auto</option>
+        <option value="30">30 s</option>
+        <option value="60">1 min</option>
+        <option value="120">2 min</option>
+        <option value="300">5 min</option>
+      </select>
+      <span class="num" id="rfNext"></span>
+      <label for="avSel">Avatars</label>
+      <select id="avSel">
+        <option value="people">People</option>
+        <option value="sites">Sites</option>
+      </select>
+      <label class="lw"><input type="checkbox" id="gLight" /> Lightweight map</label>
+      <span class="cap" id="rfCap"></span>
+    </div>
+    <p class="gnote" id="gNote">Avatar = city. Stack = nearby cities, click to zoom.</p>
+  </section>
+
+  <div class="gbr">
+    <div class="gzoom" role="group" aria-label="Zoom">
+      <button type="button" class="zb" data-t="zin" data-icon="plus" title="Zoom in" aria-label="Zoom in"></button>
+      <button type="button" class="zb" data-t="zout" data-icon="minus" title="Zoom out" aria-label="Zoom out"></button>
+    </div>
+    <section class="gpop gfeed" id="gfeed" aria-label="Live events">
+      <div class="feed-h" id="gfeedH"><b>Live events</b><span>Press M to hide</span></div>
+      <ul id="gfeedList" aria-live="polite"></ul>
+    </section>
   </div>
 
-  <div class="pl-section">
-    <div class="pl-section-title">Top Active Cities (Click to Fly)</div>
-    <div id="cityList"><div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">Loading…</span></div></div>
-  </div>
-
-  <div class="pl-section">
-    <div class="pl-section-title">Top Active Countries</div>
-    <div id="countryList"><div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">Loading…</span></div></div>
-  </div>
-
-  <div class="pl-section">
-    <div class="pl-section-title">Device Breakdown</div>
-    <div id="deviceList"><div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">Loading…</span></div></div>
-  </div>
+  <div class="gpop gcard" id="gcard" role="dialog" aria-label="City details" hidden></div>
 </div>
 
-<!-- Right Floating Controls -->
-<div id="panel-controls">
-  <button class="ctrl-btn" id="btnRotate" title="Toggle Auto-Rotation">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-  </button>
-  <button class="ctrl-btn" id="btnReset" title="Reset Camera View">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-  </button>
-  <button class="ctrl-btn" id="btnPrivacy" title="Toggle Privacy Mode">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-  </button>
-</div>
-
-<!-- Bottom Live Feed Stream Ticker -->
-<div id="panel-feed">
-  <div class="feed-header">Live visitor sample</div>
-  <div class="feed-list" id="feedList">
-    <div class="feed-card" style="opacity:0.6"><span>Listening for active visitor hits…</span></div>
-  </div>
-</div>
-
-<script src="https://unpkg.com/globe.gl@2/dist/globe.gl.min.js"></script>
-<script>
-const GLOBE_USERS_URL = '/api/globe-users';
-const REFRESH_INTERVAL_MS = 25000;
-
-let globe = null;
-let isRotating = false;
-
-function escHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function isPrivacyOn() {
-  return document.body.classList.contains('privacy-blur');
-}
-
-function flagEmoji(iso) {
-  if (!iso || iso.length !== 2) return '🌐';
-  try { return String.fromCodePoint(...[...iso.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0))); }
-  catch { return '🌐'; }
-}
-
-function createMarkerEl(user) {
-  const el = document.createElement('div');
-  el.className = 'globe-marker';
-  el.title = isPrivacyOn()
-    ? `${user.count} active visitors`
-    : `${user.city}, ${user.country} (${user.count} active)`;
-  el.innerHTML = `
-    <div class="globe-marker-dot"></div>
-    <div class="globe-marker-ring"></div>
-  `;
-  el.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (globe) {
-      globe.pointOfView({ lat: user.lat, lng: user.lng, altitude: 1.4 }, 1200);
-    }
-  });
-  return el;
-}
-
-function updateHUD(json) {
-  const users = json.users || [];
-  const cities = json.cities || [];
-  const countries = json.countries || [];
-  const devices = json.devices || [];
-
-  const rawTotal = json.totalActiveUsers ?? users.reduce((s, u) => s + u.count, 0);
-  document.getElementById('glTotalUsers').textContent = rawTotal.toLocaleString();
-
-  // Top Cities list
-  const cityEl = document.getElementById('cityList');
-  if (cities.length) {
-    const max = Math.max(1, ...cities.map(c => c.count));
-    cityEl.innerHTML = cities.slice(0, 6).map(c => {
-      const u = users.find(x => x.city === c.city);
-      const lat = u ? u.lat : 20;
-      const lng = u ? u.lng : 0;
-      return `
-        <div class="pl-row" onclick="flyToLoc(${lat}, ${lng})">
-          <span class="pl-row-icon">${flagEmoji(c.id)}</span>
-          <div style="flex:1;overflow:hidden">
-            <div class="pl-row-name" data-privacy>${escHtml(c.city)}</div>
-            <div class="pl-row-bar" style="width:${Math.round((c.count / max) * 100)}%"></div>
-          </div>
-          <span class="pl-row-count">${c.count}</span>
-        </div>`;
-    }).join('');
-  } else {
-    cityEl.innerHTML = '<div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">No active cities</span></div>';
-  }
-
-  // Countries list
-  const countryEl = document.getElementById('countryList');
-  if (countries.length) {
-    const max = Math.max(1, ...countries.map(c => c.count));
-    countryEl.innerHTML = countries.slice(0, 5).map(c => `
-      <div class="pl-row">
-        <span class="pl-row-icon">${flagEmoji(c.id)}</span>
-        <div style="flex:1;overflow:hidden">
-          <div class="pl-row-name" data-privacy>${escHtml(c.name)}</div>
-          <div class="pl-row-bar" style="width:${Math.round((c.count / max) * 100)}%"></div>
-        </div>
-        <span class="pl-row-count">${c.count}</span>
-      </div>`).join('');
-  } else {
-    countryEl.innerHTML = '<div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">No active countries</span></div>';
-  }
-
-  // Devices list
-  const devEl = document.getElementById('deviceList');
-  if (devices.length) {
-    devEl.innerHTML = devices.map(d => `
-      <div class="pl-row">
-        <span class="pl-row-name">${escHtml(d.name)}</span>
-        <span class="pl-row-count">${d.count}</span>
-      </div>`).join('');
-  } else {
-    devEl.innerHTML = '<div class="pl-row"><span class="pl-row-name" style="color:var(--g-muted)">No data</span></div>';
-  }
-
-  // Live Stream Ticker
-  const feedEl = document.getElementById('feedList');
-  if (users.length) {
-    feedEl.innerHTML = users.slice(0, 10).map(u => `
-      <div class="feed-card">
-        <span class="feed-flag">${flagEmoji(u.countryId)}</span>
-        <span class="feed-city" data-privacy>${escHtml(u.city)}</span>
-        <span class="feed-prop" data-privacy>${escHtml(u.prop || 'Active Site')}</span>
-        <span class="feed-badge">${escHtml(u.device || 'Desktop')}</span>
-      </div>`).join('');
-  } else {
-    feedEl.innerHTML = '<div class="feed-card" style="opacity:0.6"><span>No active visitors currently online</span></div>';
-  }
-}
-
-function flyToLoc(lat, lng) {
-  if (globe) {
-    globe.pointOfView({ lat, lng, altitude: 1.3 }, 1200);
-  }
-}
-
-function render3DGlobe(json) {
-  if (!globe) return;
-  const users = (json.users || []).filter(u => u.lat != null && u.lng != null);
-
-  // Markers
-  globe
-    .htmlElementsData(users)
-    .htmlLat('lat')
-    .htmlLng('lng')
-    .htmlAltitude(0.01)
-    .htmlElement(d => createMarkerEl(d));
-
-  globe.arcsData([]);
-
-  // Ripple Rings
-  globe
-    .ringsData(users.slice(0, 6))
-    .ringColor(() => '#2b7fff')
-    .ringMaxRadius(3)
-    .ringPropagationSpeed(1.6)
-    .ringRepeatPeriod(1800);
-}
-
-async function fetchGlobeData() {
-  try {
-    const res = await fetch(GLOBE_USERS_URL);
-    const json = await res.json();
-    updateHUD(json);
-    render3DGlobe(json);
-  } catch (err) {
-    console.warn('[globe] Failed to fetch globe data:', err);
-  }
-}
-
-function initEngine() {
-  const container = document.getElementById('globe-canvas');
-
-  globe = Globe({ animateIn: false })
-    .globeImageUrl('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
-    .backgroundColor('rgba(0,0,0,0)')
-    .atmosphereColor('#1348dc')
-    .atmosphereAltitude(0.14)
-    .enablePointerInteraction(true)
-    (container);
-
-  const resize = () => {
-    globe.width(window.innerWidth);
-    globe.height(window.innerHeight);
-  };
-  resize();
-  window.addEventListener('resize', resize);
-
-  globe.controls().autoRotate = false;
-  globe.controls().autoRotateSpeed = 0.35;
-
-  const loadEl = document.getElementById('globe-loading');
-  loadEl.style.opacity = '0';
-  setTimeout(() => loadEl.remove(), 500);
-
-  fetchGlobeData();
-  setInterval(fetchGlobeData, REFRESH_INTERVAL_MS);
-}
-
-// Controls
-document.getElementById('btnRotate').addEventListener('click', () => {
-  isRotating = !isRotating;
-  if (globe) globe.controls().autoRotate = isRotating;
-  document.getElementById('btnRotate').classList.toggle('active', isRotating);
-});
-
-document.getElementById('btnReset').addEventListener('click', () => {
-  if (globe) globe.pointOfView({ lat: 20, lng: 0, altitude: 2.2 }, 1000);
-});
-
-document.getElementById('btnPrivacy').addEventListener('click', () => {
-  const on = document.body.classList.toggle('privacy-blur');
-  document.getElementById('btnPrivacy').classList.toggle('active', on);
-  localStorage.setItem('pb_privacy', on ? '1' : '0');
-  fetchGlobeData();
-});
-
-window.addEventListener('load', () => {
-  const savedPrivacy = localStorage.getItem('pb_privacy') === '1';
-  document.body.classList.toggle('privacy-blur', savedPrivacy);
-  document.getElementById('btnPrivacy').classList.toggle('active', savedPrivacy);
-  initEngine();
-});
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="/js/clusterMarks.js"></script>
+<script src="/js/letterTile.js"></script>
+<script src="/js/globe.js"></script>

@@ -16,6 +16,9 @@ router.get('/api/globe-data', apiController.globeData);
 /** City-level user avatar data for the globe map */
 router.get('/api/globe-users', apiController.globeUsers);
 
+/** Site favicon by GA4 property id (cached 7 days in .data/favicons) */
+router.get('/api/favicon/:propertyId', apiController.favicon);
+
 /** Latest API quota snapshot */
 router.get('/api/quota', apiController.quotaData);
 
