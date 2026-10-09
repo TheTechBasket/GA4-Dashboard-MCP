@@ -25,36 +25,77 @@
   .marks { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
   .gpop { position: absolute; z-index: 2; background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--r-lg); box-shadow: var(--pop-shadow); }
 
-  /* Summary panel */
-  .gsum { top: 12px; left: 12px; width: min(340px, calc(100% - 24px)); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100% - 24px); overflow: auto; }
-  .tools { display: flex; gap: 2px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  /* Summary panel (variant A): header (live count, refresh, chevron), body, footer note */
+  .gsum { top: 12px; left: 12px; width: min(320px, calc(100% - 24px)); display: flex; flex-direction: column; max-height: calc(100% - 24px); overflow: hidden auto; font-size: 13px; }
+  .gsum > *, .pb > * { min-width: 0; }
+  /* Minimal scrollbars on every scrolling box of the page */
+  .gstage * { scrollbar-width: thin; scrollbar-color: var(--border-2) transparent; }
+  .gstage ::-webkit-scrollbar { width: 6px; height: 6px; }
+  .gstage ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+  .gstage ::-webkit-scrollbar-track { background: transparent; }
+  .ph { display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 12px; min-height: 44px; }
+  .pb { border-top: 1px solid var(--border); padding: 12px; display: grid; gap: 12px; }
+  .pf { border-top: 1px solid var(--border); padding: 8px 12px; margin: 0; font-size: 12px; color: var(--text-3); }
+  .tools { display: flex; flex-wrap: wrap; gap: 2px; margin: -4px 0 -4px -4px; }
+  .tools .sep { width: 1px; align-self: stretch; margin: 6px 3px; background: var(--border); }
+  /* Hover label for icon buttons (DESIGN.md rail tooltip: --text ground, --bg text, --pop-shadow) */
+  .gtip { position: absolute; z-index: 5; pointer-events: none; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 500; line-height: 1.3; padding: 4px 8px; border-radius: var(--r); box-shadow: var(--pop-shadow); white-space: nowrap; }
+  .gtip[hidden] { display: none; }
+  .lbl { font-size: 12px; color: var(--text-3); font-weight: 500; }
+  .rows { display: grid; gap: 2px; }
+  .rows:empty { display: none; }
+  .rh { display: flex; justify-content: space-between; gap: 8px; }
+  .rh .key { color: var(--good); }
+  .row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .row .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .v { color: var(--text-2); }
+  .flag { width: 24px; height: 16px; border-radius: 2px; flex: none; box-shadow: 0 0 0 1px var(--border-2); display: block; object-fit: cover; background: var(--surface-3); }
   .ib { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: var(--r); background: transparent; color: var(--text-2); cursor: pointer; padding: 0; transition: background-color .15s, color .15s; }
   .ib:hover { background: var(--surface-2); color: var(--text); }
   .ib[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-fg); }
   .ib svg, .gico svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-  .ghead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-  .ghead b { font-size: 28px; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
-  .ghead > span { color: var(--text-2); font-size: 13px; }
+  .ghead { display: flex; align-items: baseline; gap: 6px; flex: 1; min-width: 0; }
+  .ghead b { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
+  .ghead .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ghead .key { color: var(--good); }
-  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; animation: gpulse 2s ease-out infinite; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; align-self: center; flex: none; animation: gpulse 2s ease-out infinite; }
   @keyframes gpulse { 0% { opacity: 1; } 70% { opacity: .35; } 100% { opacity: 1; } }
-  .grow { display: flex; flex-direction: column; gap: 4px; }
-  .grow h3 { font-size: 12px; font-weight: 500; color: var(--text-3); margin: 0; }
-  .chips { display: flex; flex-wrap: wrap; gap: 4px; max-height: 52px; overflow: hidden; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 1px solid var(--border-2); border-radius: var(--r); background: var(--surface); font-size: 12px; color: var(--text); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-  .chip .k { color: var(--text-3); font-size: 11px; font-weight: 500; }
-  .chip .v { font-weight: 600; }
-  .rf { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 8px; font-size: 12px; color: var(--text-3); }
-  .rf select { height: 26px; border: 1px solid var(--border-2); border-radius: var(--r); background: var(--surface); color: var(--text); font: 500 12px var(--font); padding: 0 4px; }
-  .rf .cap { flex-basis: 100%; }
-  .rf .warn { color: var(--warn); }
-  .lw { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; cursor: pointer; color: var(--text-2); }
+  .chips { display: flex; gap: 4px; }
+  .chip { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 6px; flex: 0 1 auto; min-width: 0; border: 1px solid var(--border-2); border-radius: var(--r); background: var(--surface); font-size: 12px; color: var(--text); white-space: nowrap; max-width: 100%; cursor: pointer; }
+  .chip:hover { background: var(--surface-2); }
+  .chip:focus-within { outline: 2px solid var(--accent-fg); outline-offset: 2px; }
+  .chip .k { color: var(--text-3); }
+  .chip .k { flex: none; }
+  /* Customizable select (Chrome 135+) so options can carry site icons; other browsers show a plain select */
+  .chip select, .chip ::picker(select) { appearance: base-select; }
+  .chip select { min-width: 0; border: 0; background: none; color: inherit; font: inherit; padding: 0; margin: 0; cursor: pointer; field-sizing: content; display: inline-flex; align-items: center; height: 22px; line-height: 22px; max-width: 88px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; outline: none; }
+  .chip select::picker-icon { display: none; }
+  .chip ::picker(select) { margin-top: 6px; padding: 4px; min-width: 180px; max-width: 280px; max-height: 320px; border: 1px solid var(--border-2); border-radius: var(--r-lg); background: var(--surface); color: var(--text); box-shadow: var(--pop-shadow); }
+  .chip option { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: var(--r); font-size: 12px; color: var(--text); background: var(--surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip option:hover, .chip option:focus-visible { background: var(--surface-2); outline: none; }
+  .chip option:checked { color: var(--accent-fg); font-weight: 500; }
+  .chip option::checkmark { display: none; }
+  .chip option .fav { width: 16px; height: 16px; font-size: 9px; box-shadow: none; }
+  .gsum .row .fav { width: 16px; height: 16px; font-size: 9px; }
+  /* Refresh popover (opened from the strip) */
+  .grf { z-index: 4; width: 260px; padding: 12px; display: grid; gap: 10px; font-size: 12px; color: var(--text-3); }
+  .grf[hidden] { display: none; }
+  .grf-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .grf-h b { color: var(--text); font-size: 13px; font-weight: 600; }
+  .grf .btn { height: 28px; padding: 0 10px; font-size: 12px; }
+  .grf .ivl { display: flex; align-items: center; gap: 8px; }
+  .grf select { height: 28px; flex: 1; border: 1px solid var(--border-2); border-radius: var(--r); background: var(--surface); color: var(--text); font: 500 12px var(--font); padding: 0 4px; }
+  .grf p { margin: 0; line-height: 1.45; }
+  .grf .warn { color: var(--warn); }
+  .grf .lw { border-top: 1px solid var(--border); padding-top: 10px; }
+  .lw { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-2); }
   .lw input { accent-color: var(--accent); margin: 0; }
 
   /* Event feed */
-  .gbr { position: absolute; right: 12px; bottom: 12px; z-index: 2; width: min(420px, calc(100% - 24px)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+  .gbr { position: absolute; right: 12px; bottom: 12px; z-index: 2; width: min(420px, calc(100% - 24px)); max-height: calc(100% - 24px); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
   .gbr > * { pointer-events: auto; }
-  .gbr .gfeed { position: static; width: 100%; }
+  .gbr .gfeed { position: static; width: 100%; flex: none; }
+  .gbr .gzoom { flex: none; }
   .gfeed { max-height: 212px; display: flex; flex-direction: column; }
 
   /* Zoom control: DESIGN.md .btn (surface, border-2 stroke, 2px radius, 32px), stacked */
@@ -67,12 +108,10 @@
   .zb:disabled { opacity: .5; pointer-events: none; }
   .zb svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; }
 
-  /* Collapsible summary panel: toolbar + live count only */
-  .gmin { margin-left: auto; }
+  /* Collapsed panel: header only */
   .gmin svg { transition: transform .15s var(--ease-out); }
   .gsum[data-min] .gmin svg { transform: rotate(180deg); }
-  .gsum[data-min] > :not(.tools):not(.ghead) { display: none; }
-  .gnote { margin: 0; font-size: 11.5px; color: var(--text-3); }
+  .gsum[data-min] > :not(.ph) { display: none; }
   .gfeed[hidden] { display: none; }
   .feed-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-3); }
   .feed-h b { color: var(--text); font-weight: 600; font-size: 13px; }
@@ -88,49 +127,46 @@
   .av { width: 22px; height: 22px; border-radius: 50%; background: var(--surface-3); overflow: hidden; display: grid; place-items: center; font-size: 10px; font-weight: 600; color: var(--text-2); flex: none; }
   .av img { width: 100%; height: 100%; display: block; }
 
-  /* Avatar markers */
-  .mk { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; padding: 0; width: var(--s); height: var(--s); border-radius: 50%; background: var(--surface); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); transition: transform .15s var(--ease-out); display: grid; place-items: center; font: 600 10px var(--font); color: var(--text-2); }
+  /* Avatar markers: one size (48px) for every marker; a group shows up to 3 overlapping faces (.f), no count badge */
+  .mk { --m: 48px; position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; padding: 0; width: calc(var(--m) + var(--n, 0) * 11px); height: var(--m); border: 0; background: none; transition: transform .15s var(--ease-out); font: 600 12px var(--font); color: var(--text-2); }
   .mk:hover, .mk.sel { z-index: 999 !important; transform: translate(-50%, -50%) scale(1.15); }
-  .mk.sel { border-color: var(--accent); }
-  .mk img { width: 100%; height: 100%; border-radius: 50%; display: block; }
-  .mk.grp { background: none; border: 0; box-shadow: none; width: calc(var(--s) + var(--n) * 11px); }
-  .mk.grp .f { position: absolute; top: 0; left: var(--o); width: var(--s); height: var(--s); border-radius: 50%; overflow: hidden; background: var(--surface); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); display: grid; place-items: center; }
-  .mk.grp.sel .f:first-child { border-color: var(--accent); }
-  #gmarks .mk { animation: gfade .12s linear; }
+  .mk .f { position: absolute; top: 0; left: var(--o); width: var(--m); height: var(--m); border-radius: 50%; overflow: hidden; background: var(--surface); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); display: grid; place-items: center; }
+  .mk.sel .f:first-child { border-color: var(--accent); }
+  .mk .f > img:not(.fav) { width: 100%; height: 100%; display: block; }
+  .mk.new { animation: gfade .12s linear; }
   @keyframes gfade { from { opacity: 0; } }
-  .mk:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: 2px; }
+  .mk:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: 2px; border-radius: 24px; }
 
   /* Card shell (shared by the city card and the group list) */
-  .gcard { z-index: 3; width: 280px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  /* The card stacks above the zoom control and the feed in the bottom-right column, so nothing overlaps */
+  .gbr .gcard { position: relative; width: 300px; flex: 0 1 auto; min-height: 0; overflow: hidden auto; }
   .gcard[hidden] { display: none; }
   .gcard .x { position: absolute; right: 6px; top: 6px; }
-  .gcard-t { display: flex; gap: 10px; align-items: center; padding-right: 24px; }
-  .gcard-t .av { width: 36px; height: 36px; }
-  .gcard-t b { font-size: 15px; font-weight: 600; display: block; }
-  .gcard-t > div > span { font-size: 12px; color: var(--text-3); }
 
-  /* Group list card */
-  .glist { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
-  .glist button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 4px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: var(--r); }
+  /* Group list card rows */
+  .glist { list-style: none; margin: 0 -4px; padding: 0; max-height: 240px; overflow-y: auto; scrollbar-width: thin; }
+  .glist button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 4px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: var(--r); }
+  .glist li + li button { border-top: 1px solid var(--border); border-radius: 0; }
   .glist button:hover { background: var(--surface-2); }
-  .glist button > span:nth-child(2) { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .glist .ct { flex: 1; min-width: 0; }
+  .glist .ct b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .glist .num { color: var(--text-2); }
 
   /* City card body (variant A, stacked faces): renderCityCard() in globe.js. Swap this block and that function together. */
-  .gcard.city { width: 300px; padding: 0; gap: 0; }
-  .gcity .ch { display: flex; align-items: center; gap: 10px; padding: 12px 36px 12px 12px; }
-  .gcity .flag { width: 24px; height: 16px; border-radius: 2px; flex: none; box-shadow: 0 0 0 1px var(--border-2); display: block; object-fit: cover; }
+  .gcity .ch { display: flex; align-items: center; gap: 8px; padding: 12px 36px 12px 12px; }
   .gcity .ct { flex: 1; min-width: 0; }
   .gcity .ct b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .gcity .ct span { display: block; font-size: 12px; color: var(--text-3); }
+  .gcity .ct > span { display: block; font-size: 12px; color: var(--text-3); } /* group list sub line */
   .gcity .stack { display: flex; align-items: center; }
   .gcity .stack .fav + .fav { margin-left: -6px; }
   .gcity .stack .more { margin-left: 4px; font-size: 12px; color: var(--text-3); }
-  .gcity .cb { border-top: 1px solid var(--border); padding: 12px; display: grid; gap: 10px; }
+  .gcity .cb { border-top: 1px solid var(--border); padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .gcity .kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .gcity .kv div { display: grid; }
   .gcity .kv small { font-size: 12px; color: var(--text-3); }
   .gcity .kv b { font-weight: 600; }
-  .gcity .page { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gcity .tp small { display: block; font-size: 12px; color: var(--text-3); }
+  .gcity .page { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gcity .tw { max-height: 190px; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; }
   .gcity .tbl th:last-child, .gcity .tbl td:last-child { padding-right: 4px; }
   .gcity .tbl { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
@@ -144,8 +180,7 @@
 
   /* Site faces: favicon or letter tile */
   .fav { width: 20px; height: 20px; border-radius: 2px; flex: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; background: #fff; object-fit: contain; box-shadow: 0 0 0 2px var(--surface); }
-  .chip .fav { width: 14px; height: 14px; font-size: 9px; box-shadow: none; }
-  .gstage[data-av="sites"] .mk:not(.grp), .gstage[data-av="sites"] .mk.grp .f { background: #fff; }
+  .gstage[data-av="sites"] .mk .f { background: #fff; }
   .mk .fav { width: 62%; height: 62%; border-radius: 2px; box-shadow: none; }
   .mk .fav.tile { width: 100%; height: 100%; border-radius: 50%; font-size: 12px; }
 
@@ -154,20 +189,19 @@
   body.privacy-blur .gstage [data-privacy] { filter: blur(6px); user-select: none; }
 
   @media (max-width: 860px) {
-    .gsum { gap: 8px; }
-    .gsum .grow:nth-of-type(n+2), .rf .cap { display: none; }
-    .chips { max-height: 24px; }
-    .gbr { left: 0; right: 0; bottom: 0; width: 100%; align-items: flex-start; }
+    .gsum { width: auto; right: 12px; max-height: 55%; }
+    .gbr { left: 0; right: 0; bottom: 0; width: 100%; max-height: calc(100% - 68px); align-items: flex-start; }
+    .gbr:has(.gcard:not([hidden])) .gzoom { display: none; } /* bottom sheet sits right on the feed */
     .gzoom { margin-left: 12px; }
     .gfeed { max-height: 150px; border-radius: var(--r-lg) var(--r-lg) 0 0; }
     .gbr:has(.gfeed[hidden]) { bottom: 12px; }
-    .gcard { left: 0 !important; right: 0; bottom: 0; top: auto !important; width: 100%; border-radius: var(--r-lg) var(--r-lg) 0 0; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-    .gcard.city { width: 100%; padding: 0 0 env(safe-area-inset-bottom); }
-    .attr { left: auto; right: 8px; bottom: auto; top: 8px; }
+    .gbr .gcard { width: 100%; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+    .gbr:has(.gfeed[hidden]) .gcard { padding-bottom: env(safe-area-inset-bottom); }
+    .attr { left: auto; right: 12px; bottom: auto; top: 66px; } /* under the collapsed panel; the open panel covers it while open */
   }
   @media (hover: none), (pointer: coarse) {
     .ib { width: 40px; height: 40px; }
-    .rf select { height: 36px; }
+    .grf select, .grf .btn { height: 36px; }
     .zb { width: 44px; height: 44px; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -181,20 +215,34 @@
   <div class="marks" id="gmarks"></div>
 
   <section class="gpop gsum" aria-label="Live summary">
-    <div class="tools" role="toolbar" aria-label="Map controls">
-      <button type="button" class="ib" data-t="proj" data-icon="map" aria-pressed="false" title="Switch to 2D map" aria-label="Switch to 2D map"></button>
-      <button type="button" class="ib" data-t="style" data-icon="leaf" aria-pressed="false" title="Map style: Minimal (switch to Outdoors)" aria-label="Map style"></button>
-      <button type="button" class="ib" data-t="theme" data-icon="sun" title="Light or dark map" aria-label="Light or dark map"></button>
-      <button type="button" class="ib" data-t="feed" data-icon="list" aria-pressed="true" title="Show event feed (M)" aria-label="Show event feed (M)"></button>
-      <button type="button" class="ib" id="privacyBtn" data-icon="eyeoff" aria-pressed="false" title="Hide names and domains (P)" aria-label="Hide names and domains"></button>
-      <button type="button" class="ib" data-t="refresh" data-icon="refresh" title="Refresh now" aria-label="Refresh now"></button>
-      <button type="button" class="ib" data-t="full" data-icon="full" title="Fullscreen" aria-label="Fullscreen"></button>
-      <button type="button" class="ib gmin" data-t="panel" data-icon="chev" aria-expanded="true" title="Collapse panel" aria-label="Collapse panel"></button>
+    <div class="ph">
+      <div class="ghead"><span class="live-dot" aria-hidden="true"></span><b class="num" id="gTotal">0</b><span class="lbl" id="gSub">Loading live visitors</span></div>
+      <button type="button" class="ib gmin" data-t="panel" data-icon="chev" aria-expanded="true" aria-label="Collapse panel"></button>
     </div>
-    <div class="ghead"><span class="live-dot" aria-hidden="true"></span><b class="num" id="gTotal">0</b><span id="gSub">Loading live visitors</span></div>
-    <div id="gRows"></div>
-    <div class="rf">
-      <label for="rfSel">Refresh</label>
+    <div class="pb">
+      <div class="tools" role="toolbar" aria-label="Map controls">
+        <button type="button" class="ib" data-t="proj" data-icon="map" aria-pressed="false" aria-label="Switch to 2D map"></button>
+        <button type="button" class="ib" data-t="style" data-icon="leaf" aria-pressed="false" aria-label="Map style: Minimal (switch to Outdoors)"></button>
+        <button type="button" class="ib" data-t="theme" data-icon="sun" aria-label="Light or dark map"></button>
+        <span class="sep" aria-hidden="true"></span>
+        <button type="button" class="ib" data-t="avatar" data-icon="user" aria-pressed="false" aria-label="Avatars: People (switch to Sites)"></button>
+        <button type="button" class="ib" data-t="feed" data-icon="list" aria-pressed="true" aria-label="Event feed (M)"></button>
+        <button type="button" class="ib" id="privacyBtn" data-icon="eyeoff" aria-pressed="false" aria-label="Hide names and domains (P)"></button>
+        <span class="sep" aria-hidden="true"></span>
+        <button type="button" class="ib" data-t="rfpop" data-icon="refresh" aria-expanded="false" aria-controls="grf" aria-label="Refresh"></button>
+        <button type="button" class="ib" data-t="full" data-icon="full" aria-label="Fullscreen"></button>
+      </div>
+      <div class="chips" id="gChips"></div>
+      <div class="rows" id="gCountries"></div>
+      <div class="rows" id="gSites"></div>
+    </div>
+    <p class="pf" id="gNote">Avatar = city. Stack = nearby cities, click to open.</p>
+  </section>
+
+  <div class="gpop grf" id="grf" role="dialog" aria-label="Refresh" hidden>
+    <div class="grf-h"><b>Refresh</b><button type="button" class="btn" data-t="refresh">Refresh now</button></div>
+    <div class="ivl">
+      <label for="rfSel">Every</label>
       <select id="rfSel">
         <option value="auto">Auto</option>
         <option value="30">30 s</option>
@@ -202,19 +250,15 @@
         <option value="120">2 min</option>
         <option value="300">5 min</option>
       </select>
-      <span class="num" id="rfNext"></span>
-      <label for="avSel">Avatars</label>
-      <select id="avSel">
-        <option value="people">People</option>
-        <option value="sites">Sites</option>
-      </select>
-      <label class="lw"><input type="checkbox" id="gLight" /> Lightweight map</label>
-      <span class="cap" id="rfCap"></span>
     </div>
-    <p class="gnote" id="gNote">Avatar = city. Stack = nearby cities, click to zoom.</p>
-  </section>
+    <p class="num" id="rfNext"></p>
+    <p id="rfCap"></p>
+    <label class="lw"><input type="checkbox" id="gLight" /> Lightweight map</label>
+  </div>
+  <div class="gtip" id="gtip" role="tooltip" hidden></div>
 
   <div class="gbr">
+    <div class="gpop gcard" id="gcard" role="dialog" aria-label="City details" hidden></div>
     <div class="gzoom" role="group" aria-label="Zoom">
       <button type="button" class="zb" data-t="zin" data-icon="plus" title="Zoom in" aria-label="Zoom in"></button>
       <button type="button" class="zb" data-t="zout" data-icon="minus" title="Zoom out" aria-label="Zoom out"></button>
@@ -224,8 +268,6 @@
       <ul id="gfeedList" aria-live="polite"></ul>
     </section>
   </div>
-
-  <div class="gpop gcard" id="gcard" role="dialog" aria-label="City details" hidden></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>

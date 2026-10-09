@@ -12,6 +12,7 @@ const { runSafeHistoricalReport, runSafeRealtimeReport, CREDENTIALS_PATH } = req
 const { stripSensitiveGlobeUsersPayload } = require("./privacy");
 const { buildGlobeUsersPayload, refreshInfo } = require("./globeUsers");
 const { getFavicon } = require("./favicons");
+const flags = require("./flags");
 const { letterTile } = require("../public/js/letterTile");
 const { cacheGet, cacheSet, cacheCleanup, shouldBypass } = require("./reportCache");
 
@@ -507,6 +508,19 @@ exports.favicon = async (req, res) => {
     res.sendFile(file);
 };
 
+/** GET /api/flag/:cc: country flag SVG (lowercase ISO code), cached forever in .data/flags */
+exports.flag = async (req, res) => {
+    const cc = req.params.cc;
+    if (!flags.isCc(cc)) return res.sendStatus(400);
+    const svg = await flags.getFlag(cc).catch(() => null);
+    res.set({
+        "Cache-Control": svg ? "max-age=604800" : "no-store",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+        "X-Content-Type-Options": "nosniff",
+    }).type("image/svg+xml");
+    res.send(svg || flags.FALLBACK);
+};
+
 exports.quotaData = (req, res) => {
     if (!latestQuota) {
         return res.json({ ok: false, quota: null, message: "No quota data yet. Reload the dashboard first." });
@@ -715,6 +729,8 @@ async function fetchGlobeCountryData(properties) {
 // ---------------------------------------------------------------------------
 
 const GLOBE_USERS_CACHE_PATH = path.join(CACHE_DIR, "globe_users.json");
+/* Bump when the payload shape changes: an older build's cache file (no per-city sites, no feed) is then refetched, not served */
+const GLOBE_USERS_CACHE_V = 2;
 const GLOBE_USERS_TTL_SEC = 30;
 const GLOBE_USERS_MAX_AGE_SEC = 300;
 
@@ -727,7 +743,7 @@ async function getCachedGlobeUsers(maxAgeSec = GLOBE_USERS_TTL_SEC) {
     try {
         const raw  = await fs.readFile(GLOBE_USERS_CACHE_PATH, "utf8");
         const parsed = JSON.parse(raw);
-        if (!parsed?.fetchedAt) return null;
+        if (!parsed?.fetchedAt || parsed.v !== GLOBE_USERS_CACHE_V) return null;
         const ageMs = Date.now() - new Date(parsed.fetchedAt).getTime();
         if (ageMs > maxAgeSec * 1000) return null;
         return parsed;
@@ -816,6 +832,7 @@ exports.globeUsers = async (req, res) => {
                 const properties = propCache?.properties ?? [];
                 const payload = await fetchGlobeUsersData(properties);
                 payload.fetchedAt = new Date().toISOString();
+                payload.v = GLOBE_USERS_CACHE_V;
                 payload.refresh = refreshInfo(globeQuotas, globeCosts);
                 const publicPayload = stripSensitiveGlobeUsersPayload(payload);
                 await saveGlobeUsersToCache(publicPayload);

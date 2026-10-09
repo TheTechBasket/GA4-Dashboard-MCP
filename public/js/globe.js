@@ -35,6 +35,8 @@ const ICON = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
   chev: '<path d="m6 15 6-6 6 6"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  sites: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/>',
   eyeoff: '<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
 };
 const svg = (n) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
@@ -45,7 +47,7 @@ const state = {
   style: load("globe.style") === "outdoors" ? "outdoors" : "minimal",
   flat: load("globe.proj") === "2d",
   refresh: ["auto", "30", "60", "120", "300"].includes(load("globe.refresh")) ? load("globe.refresh") : "auto",
-  feed: true, filter: null, sel: null, list: null,
+  feed: true, filter: null, sel: null, list: null, f: { site: "", country: "", device: "" },
   panel: narrow() ? "min" : load("globe.panel") === "min" ? "min" : "open",
   avatar: load("globe.avatar") === "sites" ? "sites" : "people",
   data: null, cities: [], feedKeys: new Set(), newKeys: new Set(),
@@ -61,7 +63,7 @@ import("https://cdn.jsdelivr.net/npm/@dicebear/core@9.2.2/+esm").then(async (cor
   renderMarks(); renderFeed(); if (state.sel != null) renderCard(); else if (state.list) renderList();
 }).catch(() => { /* initials stay */ });
 const initials = (city) => esc(String(city || "?").replace(/[^\p{L}\p{N}]/gu, "").slice(0, 2) || "?");
-const avHtml = (city, device) => avatarUri ? `<img alt="" src="${avatarUri(city + (device || ""))}">` : `<span data-privacy>${initials(city)}</span>`;
+const avHtml = (city) => avatarUri ? `<img alt="" src="${avatarUri(city)}">` : `<span data-privacy>${initials(city)}</span>`;
 
 /* ── Site faces: favicon from /api/favicon/:id, letter tile (letterTile.js) when there is none ── */
 const noFav = new Set();
@@ -79,38 +81,53 @@ document.addEventListener("error", (e) => {
   else if (im.classList?.contains("fav")) { noFav.add(im.dataset.id); im.outerHTML = tileHtml({ id: im.dataset.id, name: im.dataset.n }); }
 }, true);
 /* Marker face: a DiceBear person, or in Sites mode the city's top site icon */
-const faceHtml = (c) => state.avatar === "sites" && c.sites?.[0] ? favHtml(c.sites[0]) : avHtml(c.city, c.device);
+const faceHtml = (c) => state.avatar === "sites" && c.sites?.[0] ? favHtml(c.sites[0]) : avHtml(c.city);
 
 /* ── Shared marker layer ──
-   Markers are keyed DOM nodes (one per group of city keys); per frame only their `translate` changes.
-   Groups are recomputed on data/zoom change or at most every 500 ms while spinning, with hysteresis
-   (merge at GROUP_PX, split at SPLIT_PX) so they do not flip at the edge. */
+   Markers are keyed DOM nodes, one per group, keyed by the sorted member city keys, so a poll with the same
+   city set reuses every node and every <img> (src is only set when the URL changes). Per frame only their
+   `translate` changes. Groups are recomputed on data/zoom change or at most every 500 ms while spinning,
+   with hysteresis (merge at GROUP_PX, split at SPLIT_PX) so they do not flip at the edge.
+   Every marker is the same size (48 px); a group shows up to 3 overlapping faces. */
 const cityKey = (c) => `${c.city}||${c.countryId}`;
-const markSize = (n) => (n >= 20 ? 58 : n >= 8 ? 48 : 40);
 const cardOpen = () => state.sel != null || !!state.list;
 const GROUP_PX = 56, SPLIT_PX = 64, RECLUSTER_MS = 500, FACE_STEP = 11;
 const markEls = new Map();
 let groups = [], keyIdx = new Map(), clusterAt = 0, clusterZoom = "", forceCluster = true;
-function renderMarks() { forceCluster = true; placeMarks(); }
+function renderMarks() { keyIdx = new Map(state.cities.map((c, i) => [cityKey(c), i])); forceCluster = true; placeMarks(); }
 /* hover title carries the count (no badge); set on hover so privacy blur is respected */
 marks.addEventListener("pointerover", (e) => { const m = e.target.closest(".mk"); if (m) m.title = document.body.classList.contains("privacy-blur") ? "" : m._label || ""; });
+/* Face of one city: an image (DiceBear data URI or favicon URL) or small HTML (initials, letter tile) */
+function faceSpec(c) {
+  const s = state.avatar === "sites" ? c.sites?.[0] : null;
+  if (s) return s.id && !noFav.has(String(s.id)) ? { img: `/api/favicon/${encodeURIComponent(s.id)}`, cls: "fav", id: String(s.id), n: siteName(s) } : { html: tileHtml(s) };
+  return avatarUri ? { img: avatarUri(c.city), cls: "" } /* seed by city only: dominant device flips between polls */ : { html: `<span data-privacy>${initials(c.city)}</span>` };
+}
+function setFace(slot, f) {
+  if (!f.img) { if (slot._html !== f.html) { slot._html = f.html; slot.innerHTML = f.html; } return; }
+  let im = slot.firstElementChild;
+  if (slot._html != null || !im || im.tagName !== "IMG") { slot._html = null; im = new Image(); im.alt = ""; slot.replaceChildren(im); }
+  if (im.className !== f.cls) im.className = f.cls;
+  if (f.id) { im.dataset.id = f.id; im.dataset.n = f.n; im.setAttribute("data-privacy", ""); } else im.removeAttribute("data-privacy");
+  if (im.getAttribute("src") !== f.img) im.src = f.img;
+}
+const setIf = (el, k, v) => { if (el[k] !== v) el[k] = v; };
 function syncMark(el, keys) {
   const ids = keys.map((k) => keyIdx.get(k)).filter((i) => i != null);
-  const first = state.cities[ids[0]];
-  if (!first) return;
+  if (!ids.length) return;
   const count = ids.reduce((n, i) => n + state.cities[i].count, 0);
-  const sel = ids.includes(state.sel) || (state.list && state.list[0] === keys[0]);
-  const label = ids.length === 1 ? `${first.city}, ${fmt(count)} active users` : `${ids.length} cities, ${fmt(count)} users`;
-  el.className = `mk${ids.length > 1 ? " grp" : ""}${sel ? " sel" : ""}`;
-  el.dataset.m = ids.join(" ");
-  el.setAttribute("aria-label", label);
-  el._label = label;
-  el.style.setProperty("--s", `${markSize(count)}px`);
-  el.style.setProperty("--n", Math.min(3, ids.length) - 1);
-  el.style.zIndex = count;
-  const inner = ids.length === 1 ? faceHtml(first)
-    : ids.slice(0, 3).map((i, j) => `<span class="f" style="--o:${j * FACE_STEP}px;z-index:${3 - j}">${faceHtml(state.cities[i])}</span>`).join("");
-  if (el._inner !== inner) { el._inner = inner; el.innerHTML = inner; }
+  const sel = ids.includes(state.sel) || (!!state.list && keys.some((k) => state.list.includes(k)));
+  const label = ids.length === 1 ? `${state.cities[ids[0]].city}, ${fmt(count)} active users` : `${ids.length} cities, ${fmt(count)} users`;
+  setIf(el, "className", `mk${sel ? " sel" : ""}${el._new ? " new" : ""}`);
+  if (el.dataset.m !== ids.join(" ")) el.dataset.m = ids.join(" ");
+  if (el._label !== label) { el._label = label; el.setAttribute("aria-label", label); }
+  const n = Math.min(3, ids.length);
+  if (el._n !== n) { el._n = n; el.style.setProperty("--n", n - 1); }
+  if (el.style.zIndex !== String(count)) el.style.zIndex = count;
+  while (el.children.length > n) el.lastElementChild.remove();
+  while (el.children.length < n) { const f = document.createElement("span"); const j = el.children.length; f.className = "f"; f.style.cssText = `--o:${j * FACE_STEP}px;z-index:${3 - j}`; el.append(f); }
+  /* keys are sorted, so each face keeps its slot from poll to poll */
+  ids.slice(0, n).forEach((i, j) => setFace(el.children[j], faceSpec(state.cities[i])));
 }
 function placeMarks() {
   if (!engine || !engine.ready) return;
@@ -126,24 +143,25 @@ function placeMarks() {
   const now = performance.now(), zoom = `${state.flat}:${Number(engine.zoom?.() ?? 0).toFixed(2)}`;
   const recluster = forceCluster || zoom !== clusterZoom || now - clusterAt > RECLUSTER_MS;
   if (recluster) {
-    if (forceCluster) keyIdx = new Map(state.cities.map((c, i) => [cityKey(c), i]));
-    groups = clusterMarks(pts, GROUP_PX, { splitPx: SPLIT_PX, prev: groups.filter((g) => g.length > 1) })
-      .map((g) => g.items.map((p) => p.i));
+    groups = clusterMarks(pts, GROUP_PX, { splitPx: SPLIT_PX, prev: groups.filter((g) => g.keys.length > 1).map((g) => g.keys) })
+      .map((g) => { const keys = g.items.map((p) => p.i).sort(); return { keys, id: keys.join("\n"), lead: g.items[0].i }; });
     forceCluster = false; clusterAt = now; clusterZoom = zoom;
   }
   const seen = new Set();
-  for (const keys of groups) {
-    const lead = keys.map((k) => vis.get(k)).find(Boolean);
+  for (const g of groups) {
+    const lead = vis.get(g.lead) || g.keys.map((k) => vis.get(k)).find(Boolean);
     if (!lead) continue;
-    const key = keys[0]; /* keyed by leader city: members joining or leaving reuse the node */
-    let el = markEls.get(key);
-    if (!el) { el = document.createElement("button"); el.type = "button"; markEls.set(key, el); marks.append(el); }
-    if (recluster || el._keys !== keys) { el._keys = keys; syncMark(el, keys); }
+    let el = markEls.get(g.id);
+    if (!el) {
+      el = document.createElement("button"); el.type = "button"; el._new = true;
+      setTimeout(() => { el._new = false; el.classList.remove("new"); }, 300); /* timer, not animationend: reduced motion runs no animation */
+      markEls.set(g.id, el); marks.append(el);
+    }
+    if (recluster || el._keys !== g.keys) { el._keys = g.keys; syncMark(el, g.keys); }
     el.style.translate = `${lead.x}px ${lead.y}px`;
-    seen.add(key);
+    seen.add(g.id);
   }
   for (const [k, el] of markEls) if (!seen.has(k)) { el.remove(); markEls.delete(k); }
-  if (cardOpen() && !narrow() && !card.hidden) positionCard();
 }
 
 /* ── Canvas engine (d3 orthographic / equirectangular, no tiles) ── */
@@ -353,22 +371,51 @@ async function startEngine(name) {
   placeMarks();
 }
 
-/* ── Summary panel ── */
-const PLATFORM = { web: "Web", android: "Android", ios: "iOS" };
-function chipRow(title, list) {
-  if (!list.length) return "";
-  return `<div class="grow"><h3>${title}</h3><div class="chips">${list.join("")}</div></div>`;
+/* ── Summary panel (variant A): live count header, filter chips, top countries, sites ── */
+/* name: the country, as alt and hover title where the flag stands in for the country text */
+const flagHtml = (cc, name = "") => /^[A-Z]{2}$/.test(cc || "")
+  ? `<img class="flag" alt="${esc(name)}"${name ? ` title="${esc(name)}"` : ""} src="/api/flag/${cc.toLowerCase()}">`
+  : '<span class="flag" aria-hidden="true"></span>';
+const DEVICE = { mobile: "Mobile", desktop: "Desktop", tablet: "Tablet" };
+/* Filters narrow the markers: a site filter shows that site's numbers per city, a device filter that device's users */
+function viewCities(users) {
+  const f = state.f;
+  return users.filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng) && (!f.country || c.countryId === f.country)).map((c) => {
+    if (f.site) {
+      const s = (c.sites || []).find((x) => String(x.id) === f.site);
+      if (!s) return null;
+      c = { ...c, count: s.users, views: s.views, keyEvents: s.keyEvents, topPage: s.topPage || c.topPage, sites: [s] };
+    }
+    if (f.device) {
+      const n = c.devices?.[f.device] || 0;
+      if (!n) return null;
+      c = { ...c, count: f.site ? Math.min(n, c.count) : n }; // ponytail: site x device split is not in the data, min() is an upper bound
+    }
+    return c;
+  }).filter(Boolean);
 }
+const opt = (v, label, cur, icon = "") => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${icon}${esc(label)}</option>`;
 function renderSummary() {
   const d = state.data || {};
   const sites = (d.properties || []).filter((p) => p.count > 0);
-  $("#gTotal").textContent = fmt(d.totalActiveUsers);
-  $("#gSub").innerHTML = `active users on <span class="num">${sites.length}</span> ${sites.length === 1 ? "site" : "sites"}, last 30 min.${d.keyEvents ? ` <span class="key num">${fmt(d.keyEvents)} key events</span>` : ""}`;
-  $("#gRows").innerHTML =
-    chipRow("Sites", sites.slice(0, 4).map((s) => `<span class="chip">${favHtml(s)}<span data-privacy>${esc(s.site)}</span> <span class="v num">${fmt(s.count)}</span></span>`)) +
-    chipRow("Countries", (d.countries || []).slice(0, 6).map((c) => `<span class="chip">${/^[A-Z]{2}$/.test(c.id) ? `<span class="k">${esc(c.id)}</span>` : ""}${esc(c.name)} <span class="v num">${fmt(c.count)}</span></span>`)) +
-    chipRow("Devices", (d.devices || []).map((x) => `<span class="chip">${esc(x.name)} <span class="v num">${fmt(x.count)}</span></span>`)) +
-    chipRow("Platform", (d.platforms || []).map((x) => `<span class="chip">${esc(PLATFORM[x.name] || x.name)} <span class="v num">${fmt(x.count)}</span></span>`));
+  const filtered = state.f.site || state.f.country || state.f.device;
+  $("#gTotal").textContent = fmt(filtered ? state.cities.reduce((n, c) => n + c.count, 0) : d.totalActiveUsers);
+  $("#gSub").textContent = filtered ? "active, filtered" : "active now";
+  const countries = d.countries || [];
+  /* not while a filter menu is open, a poll would close it */
+  if (!$("#gChips").contains(document.activeElement)) $("#gChips").innerHTML =
+    `<label class="chip" data-privacy><span class="k">Site</span><select data-f="site" aria-label="Filter by site">${opt("", "All", state.f.site)}${sites.map((s) => opt(String(s.id), s.site, state.f.site, favHtml(s))).join("")}</select></label>` +
+    `<label class="chip"><span class="k">Country</span><select data-f="country" aria-label="Filter by country">${opt("", "All", state.f.country)}${countries.filter((c) => /^[A-Z]{2}$/.test(c.id)).map((c) => opt(c.id, c.name, state.f.country)).join("")}</select></label>` +
+    `<label class="chip"><span class="k">Device</span><select data-f="device" aria-label="Filter by device">${opt("", "All", state.f.device)}${(d.devices || []).map((x) => String(x.name).toLowerCase()).filter((k) => DEVICE[k]).map((k) => opt(k, DEVICE[k], state.f.device)).join("")}</select></label>`;
+  /* Top countries: GA4 totals when unfiltered, else summed from the filtered cities */
+  let top = countries.map((c) => ({ id: c.id, name: c.name, n: c.count }));
+  if (filtered) {
+    const m = new Map();
+    for (const c of state.cities) { const r = m.get(c.countryId) || { id: c.countryId, name: c.country, n: 0 }; r.n += c.count; m.set(c.countryId, r); }
+    top = [...m.values()].sort((a, b) => b.n - a.n);
+  }
+  $("#gCountries").innerHTML = top.length ? `<span class="lbl">Top countries</span>${top.slice(0, 5).map((c) => `<div class="row">${flagHtml(c.id)}<span class="n">${esc(c.name)}</span><span class="v num">${fmt(c.n)}</span></div>`).join("")}` : "";
+  $("#gSites").innerHTML = sites.length ? `<span class="lbl rh"><span>Sites</span>${d.keyEvents ? `<span class="key"><span class="num">${fmt(d.keyEvents)}</span> key events</span>` : ""}</span>${sites.slice(0, 5).map((s) => `<div class="row">${favHtml(s)}<span class="n" data-privacy>${esc(s.site)}</span><span class="v num">${fmt(s.count)}</span></div>`).join("")}` : "";
   renderRefresh();
 }
 
@@ -376,7 +423,6 @@ function renderSummary() {
 const feedKey = (f) => `${f.city}|${f.countryId}|${f.site}|${f.page}|${f.event}`;
 const VIEW_EVENTS = new Set(["page_view", "screen_view"]);
 function feedLi(f, isNew) {
-  const city = state.cities.find((c) => c.city === f.city && c.countryId === f.countryId);
   const where = f.city === "(not set)" ? "an unknown city" : `<b data-privacy>${esc(f.city)}</b>`;
   const page = `<em data-privacy>${esc(f.page)}</em>`;
   const times = f.count > 1 ? ` <span class="num">${f.count}</span> times` : "";
@@ -385,7 +431,7 @@ function feedLi(f, isNew) {
     ? (f.count > 1 ? `Visitors in ${where} viewed ${page}${times}` : `Someone in ${where} viewed ${page}`)
     : (f.count > 1 ? `${ev} in ${where} on ${page}${times}` : `Someone in ${where}: ${ev} on ${page}`);
   const key = f.isKey && VIEW_EVENTS.has(f.event) ? ' <span class="key">with key event</span>' : "";
-  return `<li class="${isNew ? "new" : ""}"><span class="av">${avHtml(f.city, city?.device)}</span><span>${what}${key} <span class="t" data-privacy>${esc(f.site)}</span></span><span class="t num">${f.minutesAgo ? `${f.minutesAgo} min` : "now"}</span></li>`;
+  return `<li class="${isNew ? "new" : ""}"><span class="av">${avHtml(f.city)}</span><span>${what}${key} <span class="t" data-privacy>${esc(f.site)}</span></span><span class="t num">${f.minutesAgo ? `${f.minutesAgo} min` : "now"}</span></li>`;
 }
 function renderFeed() {
   const rows = (state.data?.feed || []).filter((f) => !state.filter || f.city === state.filter);
@@ -394,75 +440,60 @@ function renderFeed() {
     || `<li class="empty">${state.data ? "No events in the last 30 min." : "Loading events"}</li>`;
 }
 
-/* ── City card: renderCityCard() and the ".gcity" CSS block in globe.hbs are the whole design, swap them together ── */
+/* ── City card and group list (variant A): renderCityCard()/renderList() and the ".gcity" CSS block in globe.hbs
+   are the whole design, swap them together. Both render synchronously from the live feed already in memory;
+   only images (flag, favicons) load after first paint, over a --surface-3 placeholder. ── */
+const closeBtn = () => `<button type="button" class="ib x" data-t="close" aria-label="Close">${svg("x")}</button>`;
 function renderCityCard(c) {
   const dv = c.devices || {};
   const sites = c.sites || [];
-  const flag = /^[A-Z]{2}$/.test(c.countryId || "") ? `<img class="flag" alt="" src="/vendor/flags/${c.countryId.toLowerCase()}.svg">` : "";
   const more = sites.length > 3 ? `<span class="more num">+${sites.length - 3}</span>` : "";
   const foot = [["Mobile", dv.mobile], ["Desktop", dv.desktop], ["Tablet", dv.tablet]].filter(([, n]) => n > 0).map(([l, n]) => `${l} <span class="num">${fmt(n)}</span>`);
   if (c.lastSeen != null) foot.push(`Last seen ${c.lastSeen ? `<span class="num">${c.lastSeen}</span> min ago` : "now"}`);
   return `<div class="gcity">
-  <div class="ch">${flag}<div class="ct"><b data-privacy>${esc(c.city)}</b><span data-privacy>${esc(c.country)}</span></div><div class="stack" aria-label="${sites.length} ${sites.length === 1 ? "site" : "sites"}">${sites.slice(0, 3).map(favHtml).join("")}${more}</div></div>
+  <div class="ch">${flagHtml(c.countryId, c.country)}<div class="ct"><b data-privacy>${esc(c.city)}</b></div><div class="stack" aria-label="${sites.length} ${sites.length === 1 ? "site" : "sites"}">${sites.slice(0, 3).map(favHtml).join("")}${more}</div></div>
   <div class="cb">
     <div class="kv"><div><small>Active</small><b class="num">${fmt(c.count)}</b></div><div><small>Views</small><b class="num">${fmt(c.views)}</b></div><div><small>Key events</small><b class="num">${fmt(c.keyEvents)}</b></div></div>
-    ${c.topPage ? `<div class="page" data-privacy title="${esc(c.topPage)}">${esc(c.topPage)}</div>` : ""}
+    ${c.topPage ? `<div class="tp"><small>Top page</small><div class="page" data-privacy title="${esc(c.topPage)}">${esc(c.topPage)}</div></div>` : ""}
     ${sites.length ? `<div class="tw"><table class="tbl"><thead><tr><th>Site</th><th>Users</th><th>Views</th></tr></thead><tbody>${sites.map((x) => `<tr><td><span class="site">${favHtml(x)}<span data-privacy title="${esc(x.topPage || "")}">${esc(x.name)}</span></span></td><td class="num">${fmt(x.users)}</td><td class="num">${fmt(x.views)}</td></tr>`).join("")}</tbody></table></div>` : ""}
     ${foot.length ? `<div class="foot">${foot.join(" · ")}</div>` : ""}
   </div>
   </div>`;
 }
+function showCard(html, label) {
+  card.innerHTML = closeBtn() + html;
+  card.setAttribute("aria-label", label);
+  card.hidden = false;
+}
 function renderCard() {
   const c = state.cities[state.sel];
   if (!c) return closeCard();
-  card.innerHTML = `<button type="button" class="ib x" data-t="close" aria-label="Close">${svg("x")}</button>${renderCityCard(c)}`;
-  card.classList.add("city");
-  card.hidden = false;
-  positionCard();
+  showCard(renderCityCard(c), `${c.city} details`);
 }
 function renderList() {
-  const ids = state.list.map((k) => state.cities.findIndex((c) => cityKey(c) === k)).filter((i) => i >= 0);
+  const ids = state.list.map((k) => keyIdx.get(k)).filter((i) => i != null && state.cities[i]).sort((a, b) => state.cities[b].count - state.cities[a].count);
   if (!ids.length) return closeCard();
   const users = ids.reduce((n, i) => n + state.cities[i].count, 0);
-  card.innerHTML = `<button type="button" class="ib x" data-t="close" aria-label="Close">${svg("x")}</button>
-  <div class="gcard-t"><div><b><span class="num">${ids.length}</span> cities, <span class="num">${fmt(users)}</span> users</b><span>Too close together to split on the map</span></div></div>
-  <ul class="glist">${ids.map((i) => { const c = state.cities[i]; return `<li><button type="button" data-i="${i}"><span class="av">${avHtml(c.city, c.device)}</span><span data-privacy>${esc(c.city)}</span><span class="num">${fmt(c.count)}</span></button></li>`; }).join("")}</ul>`;
-  card.classList.remove("city");
-  card.hidden = false;
-  positionCard();
+  showCard(`<div class="gcity">
+  <div class="ch"><div class="ct"><b><span class="num">${ids.length}</span> cities</b><span><span class="num">${fmt(users)}</span> active users. Zoom in to split.</span></div></div>
+  <div class="cb"><ul class="glist">${ids.map((i) => { const c = state.cities[i]; return `<li><button type="button" data-i="${i}">${flagHtml(c.countryId, c.country)}<span class="ct"><b data-privacy>${esc(c.city)}</b></span><span class="num">${fmt(c.count)}</span></button></li>`; }).join("")}</ul>
+  <div class="foot">Click a city for its details.</div></div>
+  </div>`, "Nearby cities");
 }
+/* Group: list its cities, no auto zoom (zoom by hand to split the stack) */
 function openGroup(ids) {
-  const lead = state.cities[ids[0]];
-  if (!lead || !engine) return;
-  closeCard();
-  if (engine.zoomIn(lead, () => {})) return;
-  state.list = ids.map((i) => cityKey(state.cities[i]));
-  renderMarks(); renderList();
+  const keys = ids.map((i) => state.cities[i] && cityKey(state.cities[i])).filter(Boolean);
+  if (!keys.length) return;
+  state.sel = null; state.filter = null; state.list = keys;
+  renderMarks(); renderList(); renderFeed();
 }
-function positionCard() {
-  if (narrow()) { card.style.left = ""; card.style.top = ""; return; }
-  const a = state.sel ?? state.cities.findIndex((c) => cityKey(c) === state.list?.[0]);
-  const el = a >= 0 ? marks.querySelector(`[data-m~="${a}"]`) : null;
-  if (!el) return;
-  /* Try right, above, left, below the marker; skip any spot that covers the marker, the feed or the zoom control */
-  const S = stage.getBoundingClientRect(), w = card.offsetWidth, h = card.offsetHeight, gap = 10;
-  const rel = (r) => ({ l: r.left - S.left, t: r.top - S.top, r: r.right - S.left, b: r.bottom - S.top });
-  const m = rel(el.getBoundingClientRect()), mx = (m.l + m.r) / 2;
-  const blocks = [m, ...[feedBox, $(".gzoom")].filter((b) => b && !b.hidden && b.offsetParent).map((b) => rel(b.getBoundingClientRect()))];
-  const fit = ([x, y]) => [Math.max(8, Math.min(x, S.width - w - 8)), Math.max(8, Math.min(y, S.height - h - 8))];
-  const spots = [[m.r + gap, m.t - 20], [mx - w / 2, m.t - gap - h], [m.l - gap - w, m.t - 20], [mx - w / 2, m.b + gap]].map(fit);
-  const clear = ([x, y]) => !blocks.some((b) => x < b.r && x + w > b.l && y < b.b && y + h > b.t);
-  const [x, y] = spots.find(clear) || spots[0];
-  card.style.left = `${x}px`;
-  card.style.top = `${y}px`;
-}
+/* Card paints in the click handler (bottom-right column, above the feed); the camera move runs after */
 function openCity(i) {
   const c = state.cities[i];
   if (!c || !engine) return;
-  closeCard();
-  state.sel = i; state.filter = c.city;
-  renderMarks();
-  engine.flyTo(c, () => { if (state.sel === i) { renderCard(); renderFeed(); } });
+  state.list = null; state.sel = i; state.filter = c.city;
+  renderMarks(); renderCard(); renderFeed();
+  engine.flyTo(c, () => {});
 }
 function closeCard() {
   const had = state.filter, open = cardOpen();
@@ -478,7 +509,7 @@ function applyData(j) {
   const selKey = state.sel != null && state.cities[state.sel] ? cityKey(state.cities[state.sel]) : null;
   const first = !state.data;
   state.data = j;
-  state.cities = (j.users || []).filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng));
+  state.cities = viewCities(j.users || []);
   const keys = new Set((j.feed || []).map(feedKey));
   state.newKeys = first ? new Set() : new Set([...keys].filter((k) => !state.feedKeys.has(k)));
   state.feedKeys = keys;
@@ -532,18 +563,21 @@ setInterval(() => {
 function syncTools() {
   const proj = stage.querySelector('[data-t="proj"]');
   const projLabel = state.flat ? "Switch to 3D globe" : "Switch to 2D map";
-  proj.innerHTML = svg(state.flat ? "globe" : "map"); proj.title = projLabel; proj.setAttribute("aria-label", projLabel);
+  proj.innerHTML = svg(state.flat ? "globe" : "map"); proj.setAttribute("aria-label", projLabel);
   proj.setAttribute("aria-pressed", String(state.flat));
   const st = stage.querySelector('[data-t="style"]');
   st.setAttribute("aria-pressed", String(state.style === "outdoors"));
-  st.title = state.style === "outdoors" ? "Map style: Outdoors (switch to Minimal)" : "Map style: Minimal (switch to Outdoors)";
+  st.setAttribute("aria-label", state.style === "outdoors" ? "Map style: Outdoors (switch to Minimal)" : "Map style: Minimal (switch to Outdoors)");
+  const av = stage.querySelector('[data-t="avatar"]'), sitesMode = state.avatar === "sites";
+  av.innerHTML = svg(sitesMode ? "sites" : "user"); av.setAttribute("aria-pressed", String(sitesMode));
+  av.setAttribute("aria-label", sitesMode ? "Avatars: Sites (switch to People)" : "Avatars: People (switch to Sites)");
   stage.querySelector('[data-t="feed"]').setAttribute("aria-pressed", String(state.feed));
   const pb = stage.querySelector('[data-t="panel"]'), min = state.panel === "min", pl = min ? "Expand panel" : "Collapse panel";
   stage.querySelectorAll(".zb").forEach((b) => { b.disabled = engine?.name === "canvas" && state.flat; });
-  $(".gsum").toggleAttribute("data-min", min); pb.setAttribute("aria-expanded", String(!min)); pb.title = pl; pb.setAttribute("aria-label", pl);
+  $(".gsum").toggleAttribute("data-min", min); pb.setAttribute("aria-expanded", String(!min)); pb.setAttribute("aria-label", pl);
   feedBox.hidden = !state.feed;
   stage.dataset.av = state.avatar;
-  $("#gNote").textContent = state.avatar === "sites" ? "Icon = top site in a city. Stack = nearby cities, click to zoom." : "Avatar = city. Stack = nearby cities, click to zoom.";
+  $("#gNote").textContent = state.avatar === "sites" ? "Icon = top site in a city. Stack = nearby cities, click to open." : "Avatar = city. Stack = nearby cities, click to open.";
   $("#gLight").checked = state.engine === "canvas" || engine?.name === "canvas";
   /* Dark space backdrop for the vivid looks (MapLibre globe or Outdoors) */
   if ((engine?.name !== "canvas" && !state.flat) || state.style === "outdoors") root.dataset.gspace = "dark"; else delete root.dataset.gspace;
@@ -570,21 +604,52 @@ stage.addEventListener("click", (e) => {
     if (nav) nav.click(); else root.dataset.theme = isDark() ? "light" : "dark";
   } else if (t === "feed") { state.feed = !state.feed; syncTools(); }
   else if (t === "refresh") poll(0);
-  else if (t === "panel") { state.panel = state.panel === "min" ? "open" : "min"; save("globe.panel", state.panel); syncTools(); }
+  else if (t === "rfpop") toggleRf();
+  else if (t === "avatar") { state.avatar = state.avatar === "sites" ? "people" : "sites"; save("globe.avatar", state.avatar); syncTools(); renderMarks(); showTip(e.target.closest(".ib")); }
+  else if (t === "panel") { state.panel = state.panel === "min" ? "open" : "min"; save("globe.panel", state.panel); if (state.panel === "min") toggleRf(false); syncTools(); }
   else if (t === "zin" || t === "zout") engine?.ready && engine.zoomBy(t === "zin" ? 2 : 0.5);
   else if (t === "full") {
     if (document.fullscreenElement) document.exitFullscreen?.(); else stage.requestFullscreen?.().catch(() => {});
   }
 });
+$("#gChips").addEventListener("change", (e) => {
+  const k = e.target.dataset.f;
+  if (!k || !state.data) return;
+  state.f[k] = e.target.value;
+  closeCard();
+  state.cities = viewCities(state.data.users || []);
+  renderSummary(); renderMarks();
+});
 $("#rfSel").addEventListener("change", (e) => {
   state.refresh = e.target.value; save("globe.refresh", state.refresh);
   nextAt = Date.now() + interval() * 1000; renderRefresh();
 });
-$("#avSel").value = state.avatar;
-$("#avSel").addEventListener("change", (e) => {
-  state.avatar = e.target.value === "sites" ? "sites" : "people"; save("globe.avatar", state.avatar);
-  syncTools(); renderMarks();
-});
+/* Refresh popover: opens under the strip button, closes on outside click or Escape */
+const rfPop = $("#grf"), rfBtn = stage.querySelector('[data-t="rfpop"]');
+function toggleRf(open = rfPop.hidden) {
+  rfPop.hidden = !open; rfBtn.setAttribute("aria-expanded", String(open)); rfBtn.setAttribute("aria-pressed", String(open));
+  if (!open) return;
+  hideTip();
+  const S = stage.getBoundingClientRect(), r = rfBtn.getBoundingClientRect();
+  rfPop.style.left = `${Math.max(12, Math.min(r.left - S.left, S.width - rfPop.offsetWidth - 12))}px`;
+  rfPop.style.top = `${r.bottom - S.top + 6}px`;
+}
+document.addEventListener("pointerdown", (e) => { if (!rfPop.hidden && !rfPop.contains(e.target) && !rfBtn.contains(e.target)) toggleRf(false); });
+/* Hover label for the panel icon buttons, from aria-label, kept inside the stage */
+const tip = $("#gtip");
+function showTip(b) {
+  if (!b || !matchMedia("(hover: hover)").matches || (b === rfBtn && !rfPop.hidden)) return hideTip();
+  tip.textContent = b.getAttribute("aria-label"); tip.hidden = false;
+  const S = stage.getBoundingClientRect(), r = b.getBoundingClientRect(), w = tip.offsetWidth;
+  tip.style.left = `${Math.max(8, Math.min(r.left - S.left + r.width / 2 - w / 2, S.width - w - 8))}px`;
+  tip.style.top = `${r.bottom - S.top + 6}px`;
+}
+function hideTip() { tip.hidden = true; }
+const tipBtn = (e) => e.target.closest?.(".gsum .ib");
+stage.addEventListener("pointerover", (e) => { const b = tipBtn(e); if (b) showTip(b); });
+stage.addEventListener("pointerout", (e) => { if (tipBtn(e) && !tipBtn(e).contains(e.relatedTarget)) hideTip(); });
+stage.addEventListener("focusin", (e) => { const b = tipBtn(e); if (b?.matches(":focus-visible")) showTip(b); });
+stage.addEventListener("focusout", hideTip);
 $("#gLight").addEventListener("change", (e) => {
   state.engine = e.target.checked ? "canvas" : "ml"; save("globe.engine", state.engine);
   closeCard(); startEngine(state.engine);
@@ -592,7 +657,7 @@ $("#gLight").addEventListener("change", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.target.closest?.("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === "m" || e.key === "M") { state.feed = !state.feed; syncTools(); }
-  if (e.key === "Escape") closeCard();
+  if (e.key === "Escape") { if (!rfPop.hidden) { toggleRf(false); rfBtn.focus(); } else closeCard(); }
 });
 let rz;
 const onResize = () => { clearTimeout(rz); rz = setTimeout(() => { engine?.ready && engine.resize(); }, 120); };

@@ -19,6 +19,9 @@ router.get('/api/globe-users', apiController.globeUsers);
 /** Site favicon by GA4 property id (cached 7 days in .data/favicons) */
 router.get('/api/favicon/:propertyId', apiController.favicon);
 
+/** Country flag SVG by lowercase ISO code (cached forever in .data/flags) */
+router.get('/api/flag/:cc', apiController.flag);
+
 /** Latest API quota snapshot */
 router.get('/api/quota', apiController.quotaData);
 
