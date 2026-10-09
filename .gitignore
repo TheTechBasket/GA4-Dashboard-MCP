@@ -179,3 +179,7 @@ plans/
 # Runtime caches (favicons, globe state) and local browser test output
 .data/
 .playwright-mcp/
+
+# Internal specs and design tooling (never commit)
+tasks/
+.impeccable/
