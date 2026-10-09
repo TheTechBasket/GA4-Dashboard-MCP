@@ -209,6 +209,18 @@ if (document.getElementById('quotaMeters')) {
       <span class="why" data-privacy>${escHtmlMain(why)}</span></div>`;
   }
 
+  const SPIKES_KEY = 'ga4dash.spikesCollapsed';
+  let spikesCollapsed = false;
+  try { spikesCollapsed = localStorage.getItem(SPIKES_KEY) === '1'; } catch { /* private mode */ }
+  const spikeToggle = open => `<button class="btn btn-ghost btn-icon btn-sm spike-tg" type="button" data-spike-toggle aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} spike alerts" title="${open ? 'Collapse' : 'Expand'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${open ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'}"/></svg></button>`;
+  document.getElementById('spikeBanner')?.addEventListener('click', e => {
+    if (!e.target.closest('[data-spike-toggle]')) return;
+    spikesCollapsed = !spikesCollapsed;
+    try { localStorage.setItem(SPIKES_KEY, spikesCollapsed ? '1' : '0'); } catch { /* keep for this page */ }
+    render();
+    document.querySelector('#spikeBanner [data-spike-toggle]')?.focus();
+  });
+
   function render() {
     const m = model();
     document.getElementById('jsTotal').textContent = nf(m.total);
@@ -218,11 +230,18 @@ if (document.getElementById('quotaMeters')) {
 
     const banner = document.getElementById('spikeBanner');
     banner.hidden = !m.spikes.length;
-    // Top 2 get a full banner; the rest are named in one line (their cards still show the spike).
-    const more = m.spikes.slice(2);
-    banner.innerHTML = m.spikes.slice(0, 2).map(spikeBanner).join('') + (more.length
-      ? `<p class="spike-more">${more.length} more spiking: <span data-privacy>${more.map(p => escHtmlMain(p.siteName)).join(', ')}</span></p>`
-      : '');
+    const names = list => `<span data-privacy>${list.map(p => escHtmlMain(p.siteName)).join(', ')}</span>`;
+    if (spikesCollapsed) {
+      // Collapsed: one line naming every spiking site; the cards still show each spike.
+      banner.innerHTML = `<div class="spike spike-min" role="status"><span class="t">${m.spikes.length} ${m.spikes.length === 1 ? 'site' : 'sites'} spiking: ${names(m.spikes)}</span>${spikeToggle(false)}</div>`;
+    } else {
+      // Top 2 get a full banner; the rest are named in one line (their cards still show the spike).
+      const more = m.spikes.slice(2);
+      banner.innerHTML = m.spikes.slice(0, 2).map(spikeBanner).join('') + (more.length
+        ? `<p class="spike-more">${more.length} more spiking: ${names(more)}</p>`
+        : '');
+      banner.querySelector('.spike .badge')?.insertAdjacentHTML('afterend', spikeToggle(true));
+    }
 
     const grid = document.getElementById('propGrid');
     grid.innerHTML = m.live.length

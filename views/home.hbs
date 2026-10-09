@@ -39,6 +39,12 @@
   .spike .t { font-weight: 600; min-width: 0; }
   .spike .why { grid-column: 1 / -1; color: var(--text-2); font-size: .8125rem; overflow-wrap: anywhere; }
   .spike-more { margin: 8px 0 0; font-size: .8125rem; color: var(--text-2); }
+  .spike { align-items: center; }
+  .spike:has(.spike-tg) { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .spike:has(.spike-tg) .why { grid-column: 1 / -1; }
+  .spike-tg { margin: -6px -8px -6px 0; color: var(--text-2); }
+  .spike-min { padding-block: 8px; }
+  .spike-min .t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* Property cards */
   .c-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
