@@ -82,7 +82,8 @@ app.engine('hbs', exphbs.engine({
 	extname: 'hbs',
 	helpers: {
 		json_stringify: function (context) {
-			return JSON.stringify(context);
+			// Escape < so a value holding </script> cannot close the inline script tag
+			return JSON.stringify(context).replace(/</g, '\\u003c');
 		},
 		json_parse: function (context) {
 			return JSON.parse(context);

@@ -84,8 +84,16 @@ function isPublicUrl(u) {
 }
 
 async function fetchCapped(url, cap) {
-    if (!isPublicUrl(url)) throw new Error("blocked host");
-    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), redirect: "follow", headers: { "user-agent": "Mozilla/5.0 (GA4 Dashboard favicon fetch)" } });
+    let res;
+    // Follow redirects by hand so every hop passes the host check
+    for (let hop = 0; ; hop++) {
+        if (!isPublicUrl(url)) throw new Error("blocked host");
+        res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), redirect: "manual", headers: { "user-agent": "Mozilla/5.0 (GA4 Dashboard favicon fetch)" } });
+        const loc = res.status >= 300 && res.status < 400 && res.headers.get("location");
+        if (!loc) break;
+        if (hop >= 4) throw new Error("too many redirects");
+        url = new URL(loc, url).href;
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const chunks = [];
     let size = 0;
