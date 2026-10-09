@@ -21,7 +21,7 @@
   const ctx = canvas.getContext('2d');
   const proj = d3.geoOrthographic().clipAngle(90);
   const path = d3.geoPath(proj, ctx);
-  let size = 0, cities = [], rot = [-78, -18], last = 0;
+  let size = 0, cities = [], rot = [-78, -18], last = 0, centered = false;
 
   function fit() {
     const css = tile.querySelector('canvas, svg').offsetWidth || 200; // offsetWidth ignores the hover scale
@@ -60,7 +60,7 @@
   }
 
   function frame(now) {
-    if (last) rot[0] += Math.min(100, now - last) * 0.006; // ~6 degrees a second
+    if (last) rot[0] -= Math.min(100, now - last) * 0.006; // ~6 degrees a second, cities drift left into view
     last = now;
     proj.rotate(rot);
     draw(now);
@@ -74,10 +74,11 @@
       cities = (j.users || []).filter(c => Number.isFinite(c.lat) && Number.isFinite(c.lng)).sort((a, b) => b.count - a.count);
       const n = cities.reduce((s, c) => s + c.count, 0);
       tile.setAttribute('aria-label', n ? `Open the live globe, ${n} visitors on the map` : 'Open the live globe');
-      if (still && cities.length) {
-        const top = cities.reduce((a, b) => (b.count > a.count ? b : a));
-        rot = [-top.lng, -top.lat * .6];
-        proj.rotate(rot); draw(0);
+      if (cities.length && !centered) {
+        // Start on the busiest city; the spin carries it left across the part the card does not clip
+        centered = true;
+        rot = [-cities[0].lng, -cities[0].lat * .6];
+        if (still) { proj.rotate(rot); draw(0); }
       }
     } catch { /* globe still spins without dots */ }
   }
