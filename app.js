@@ -93,6 +93,14 @@ app.set('view engine', 'hbs');
 // If no GA4 service-account key is present, every route except /setup
 // renders the setup instructions instead of crashing on a missing credential.
 const { CREDENTIALS_PATH } = require('./controllers/ga4Service');
+
+// Navbar: page title and active icon from the path (views/partials/navbar.hbs)
+const NAV_PAGES = { '/': 'Dashboard', '/globe': 'Globe', '/analytics': 'Analytics', '/setup': 'Setup' };
+app.use((req, res, next) => {
+	const title = NAV_PAGES[req.path] || '';
+	res.locals.nav = { title, dash: title === 'Dashboard', globe: title === 'Globe', analytics: title === 'Analytics' };
+	next();
+});
 app.get('/setup', (req, res) => {
 	res.render('setup', {
 		head: { title: 'GA4 Dashboard & MCP · Setup', description: 'Connect a GA4 service account', image: '', url: '' },

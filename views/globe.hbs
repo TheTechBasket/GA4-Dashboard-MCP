@@ -66,6 +66,7 @@
   .chip:focus-within { outline: 2px solid var(--accent-fg); outline-offset: 2px; }
   .chip .k { color: var(--text-3); }
   .chip .k { flex: none; }
+  .chip:not(.set) { flex-shrink: 0; } /* "All" never shrinks; only a chip with a value set may ellipsize */
   /* Customizable select (Chrome 135+) so options can carry site icons; other browsers show a plain select */
   .chip select, .chip ::picker(select) { appearance: base-select; }
   .chip select { min-width: 0; border: 0; background: none; color: inherit; font: inherit; padding: 0; margin: 0; cursor: pointer; field-sizing: content; display: inline-flex; align-items: center; height: 22px; line-height: 22px; max-width: 88px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; outline: none; }
@@ -133,13 +134,14 @@
   .mk .f { position: absolute; top: 0; left: var(--o); width: var(--m); height: var(--m); border-radius: 50%; overflow: hidden; background: var(--surface); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); display: grid; place-items: center; }
   .mk.sel .f:first-child { border-color: var(--accent); }
   .mk .f > img:not(.fav) { width: 100%; height: 100%; display: block; }
+  .mk img { -webkit-user-drag: none; user-select: none; pointer-events: none; } /* a native image drag would swallow the map pan */
   .mk.new { animation: gfade .12s linear; }
   @keyframes gfade { from { opacity: 0; } }
   .mk:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: 2px; border-radius: 24px; }
 
   /* Card shell (shared by the city card and the group list) */
-  /* The card stacks above the zoom control and the feed in the bottom-right column, so nothing overlaps */
-  .gbr .gcard { position: relative; width: 300px; flex: 0 1 auto; min-height: 0; overflow: hidden auto; }
+  /* The card opens next to the clicked avatar; globe.js positionCard() places it clear of the panel, feed and zoom */
+  .gcard { z-index: 3; width: 300px; overflow: hidden auto; }
   .gcard[hidden] { display: none; }
   .gcard .x { position: absolute; right: 6px; top: 6px; }
 
@@ -191,12 +193,12 @@
   @media (max-width: 860px) {
     .gsum { width: auto; right: 12px; max-height: 55%; }
     .gbr { left: 0; right: 0; bottom: 0; width: 100%; max-height: calc(100% - 68px); align-items: flex-start; }
-    .gbr:has(.gcard:not([hidden])) .gzoom { display: none; } /* bottom sheet sits right on the feed */
+    .gstage:has(.gcard:not([hidden])) .gzoom { display: none; } /* bottom sheet sits right on the feed */
     .gzoom { margin-left: 12px; }
     .gfeed { max-height: 150px; border-radius: var(--r-lg) var(--r-lg) 0 0; }
     .gbr:has(.gfeed[hidden]) { bottom: 12px; }
-    .gbr .gcard { width: 100%; border-radius: var(--r-lg) var(--r-lg) 0 0; }
-    .gbr:has(.gfeed[hidden]) .gcard { padding-bottom: env(safe-area-inset-bottom); }
+    .gcard { width: auto; border-radius: var(--r-lg) var(--r-lg) 0 0; } /* bottom sheet: globe.js sets left, right and bottom */
+    .gstage:has(.gfeed[hidden]) .gcard { padding-bottom: env(safe-area-inset-bottom); }
     .attr { left: auto; right: 12px; bottom: auto; top: 66px; } /* under the collapsed panel; the open panel covers it while open */
   }
   @media (hover: none), (pointer: coarse) {
@@ -257,8 +259,8 @@
   </div>
   <div class="gtip" id="gtip" role="tooltip" hidden></div>
 
+  <div class="gpop gcard" id="gcard" role="dialog" aria-label="City details" hidden></div>
   <div class="gbr">
-    <div class="gpop gcard" id="gcard" role="dialog" aria-label="City details" hidden></div>
     <div class="gzoom" role="group" aria-label="Zoom">
       <button type="button" class="zb" data-t="zin" data-icon="plus" title="Zoom in" aria-label="Zoom in"></button>
       <button type="button" class="zb" data-t="zout" data-icon="minus" title="Zoom out" aria-label="Zoom out"></button>

@@ -528,6 +528,16 @@ exports.quotaData = (req, res) => {
     res.json({ ok: true, quota: latestQuota });
 };
 
+/** GET /api/nav-index: sites and report names for the navbar jump palette */
+exports.navIndex = async (req, res) => {
+    const props = (await getCachedProperties())?.properties ?? [];
+    res.json({
+        ok: true,
+        sites: props.map((p) => ({ id: String(p.id), name: p.site || p.domain || String(p.id), domain: p.domain || "" })),
+        reports: getAnalyticsCatalog().map((c) => ({ id: c.type, name: c.title, group: c.group })),
+    });
+};
+
 /** GET /api/spikes – detects traffic spikes and analyzes referral sources */
 exports.trafficSpikes = async (req, res) => {
     try {

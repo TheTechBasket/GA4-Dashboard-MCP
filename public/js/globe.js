@@ -63,7 +63,7 @@ import("https://cdn.jsdelivr.net/npm/@dicebear/core@9.2.2/+esm").then(async (cor
   renderMarks(); renderFeed(); if (state.sel != null) renderCard(); else if (state.list) renderList();
 }).catch(() => { /* initials stay */ });
 const initials = (city) => esc(String(city || "?").replace(/[^\p{L}\p{N}]/gu, "").slice(0, 2) || "?");
-const avHtml = (city) => avatarUri ? `<img alt="" src="${avatarUri(city)}">` : `<span data-privacy>${initials(city)}</span>`;
+const avHtml = (city) => avatarUri ? `<img alt="" src="${avatarUri(city)}">` : `<span>${initials(city)}</span>`;
 
 /* ── Site faces: favicon from /api/favicon/:id, letter tile (letterTile.js) when there is none ── */
 const noFav = new Set();
@@ -97,11 +97,19 @@ let groups = [], keyIdx = new Map(), clusterAt = 0, clusterZoom = "", forceClust
 function renderMarks() { keyIdx = new Map(state.cities.map((c, i) => [cityKey(c), i])); forceCluster = true; placeMarks(); }
 /* hover title carries the count (no badge); set on hover so privacy blur is respected */
 marks.addEventListener("pointerover", (e) => { const m = e.target.closest(".mk"); if (m) m.title = document.body.classList.contains("privacy-blur") ? "" : m._label || ""; });
+/* A press or wheel that starts on a marker still moves the map: the marker forwards it to the engine's input
+   element (MapLibre and d3.drag track the rest of the drag on the document). A click opens the card only when
+   the pointer did not travel, so a drag that starts on a marker does not open one. */
+marks.addEventListener("mousedown", (e) => { const t = engine?.input?.(); if (t && e.target.closest(".mk")) t.dispatchEvent(new MouseEvent("mousedown", e)); });
+marks.addEventListener("wheel", (e) => { const t = engine?.input?.(); if (!t) return; e.preventDefault(); t.dispatchEvent(new WheelEvent("wheel", e)); }, { passive: false });
+let downXY = [0, 0];
+marks.addEventListener("pointerdown", (e) => { downXY = [e.clientX, e.clientY]; });
+const dragged = (e) => Math.hypot(e.clientX - downXY[0], e.clientY - downXY[1]) > 6;
 /* Face of one city: an image (DiceBear data URI or favicon URL) or small HTML (initials, letter tile) */
 function faceSpec(c) {
   const s = state.avatar === "sites" ? c.sites?.[0] : null;
   if (s) return s.id && !noFav.has(String(s.id)) ? { img: `/api/favicon/${encodeURIComponent(s.id)}`, cls: "fav", id: String(s.id), n: siteName(s) } : { html: tileHtml(s) };
-  return avatarUri ? { img: avatarUri(c.city), cls: "" } /* seed by city only: dominant device flips between polls */ : { html: `<span data-privacy>${initials(c.city)}</span>` };
+  return avatarUri ? { img: avatarUri(c.city), cls: "" } /* seed by city only: dominant device flips between polls */ : { html: `<span>${initials(c.city)}</span>` };
 }
 function setFace(slot, f) {
   if (!f.img) { if (slot._html !== f.html) { slot._html = f.html; slot.innerHTML = f.html; } return; }
@@ -162,6 +170,7 @@ function placeMarks() {
     seen.add(g.id);
   }
   for (const [k, el] of markEls) if (!seen.has(k)) { el.remove(); markEls.delete(k); }
+  if (!card.hidden) positionCard();
 }
 
 /* ── Canvas engine (d3 orthographic / equirectangular, no tiles) ── */
@@ -181,6 +190,7 @@ function canvasEngine() {
   const api = {
     name: "canvas", horizonPad: 0.05, ready: false,
     zoom: () => k,
+    input: () => canvas, /* element that takes drag and wheel input */
     async init() {
       await loadWorld();
       if (dead) throw new Error("cancelled");
@@ -189,7 +199,7 @@ function canvasEngine() {
       ctx = canvas.getContext("2d");
       d3.select(canvas).call(d3.drag()
         .on("start", () => { drag = true; canvas.style.cursor = "grabbing"; })
-        .on("drag", (e) => { if (state.flat) return; rot[0] += e.dx * 0.3; rot[1] = Math.max(-60, Math.min(60, rot[1] - e.dy * 0.3)); proj.rotate(rot); api.draw(); })
+        .on("drag", (e) => { if (state.flat) return; rot[0] += e.dx * 0.3; rot[1] = Math.max(-90, Math.min(90, rot[1] - e.dy * 0.3)); proj.rotate(rot); api.draw(); })
         .on("end", () => { drag = false; canvas.style.cursor = "grab"; }));
       canvas.addEventListener("wheel", onWheel, { passive: false });
       api.ready = true;
@@ -257,16 +267,15 @@ function canvasEngine() {
 }
 
 /* ── MapLibre engine (OpenFreeMap tiles, tile borders removed, India POV borders on top) ── */
-function loadScript(src) {
-  if (window.maplibregl) return Promise.resolve();
-  return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => no(new Error("script failed to load")); document.head.append(s); });
-}
+/* MapLibre 6 ships as an ES module; it loads its worker (maplibre-gl-worker.mjs) from the same folder */
+let maplibregl = null;
+const loadMapLibre = async () => (maplibregl ||= await import("/vendor/maplibre/maplibre-gl.mjs"));
 function loadCss(href) {
   if (document.querySelector(`link[href="${href}"]`)) return;
   const l = document.createElement("link"); l.rel = "stylesheet"; l.href = href; document.head.append(l);
 }
 function webglOk() {
-  try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; }
+  try { const c = document.createElement("canvas"); return !!c.getContext("webgl2"); /* MapLibre 6 needs WebGL2 */ } catch { return false; }
 }
 function mlEngine() {
   let map = null, el = null, borders = null, dead = false;
@@ -306,10 +315,13 @@ function mlEngine() {
   const api = {
     name: "ml", horizonPad: 0.2, ready: false,
     zoom: () => map?.getZoom() ?? 0,
+    input: () => map?.getCanvasContainer(),
+    /* a new press ends any inertia or camera ease first, so the gesture handlers start from a clean state */
+    halt: () => map?.isMoving() && map.stop(),
     async init() {
       if (!webglOk()) throw new Error("WebGL unavailable");
       loadCss("/vendor/maplibre/maplibre-gl.css");
-      const [, b] = await Promise.all([loadScript("/vendor/maplibre/maplibre-gl.js"), fetch("/data/borders-ind.json").then((r) => r.json())]);
+      const [, b] = await Promise.all([loadMapLibre(), fetch("/data/borders-ind.json").then((r) => r.json())]);
       if (dead) throw new Error("cancelled");
       borders = b;
       el = document.createElement("div"); host.append(el);
@@ -338,6 +350,8 @@ function mlEngine() {
     },
     setStyle() { map?.setStyle(styleUrl(), { diff: false }); },
     setProjection() { try { map.setProjection({ type: state.flat ? "mercator" : "globe" }); } catch { /* noop */ } sky(); placeMarks(); },
+    /* setCenter is a jumpTo, and jumpTo calls stop(), which resets every gesture handler. The spin loop
+       must never run while the user holds or wheels the map (see userBusy), or a pan or zoom dies. */
     spin(dt) {
       if (!map || state.flat || cardOpen() || !map.isStyleLoaded() || map.isMoving() || map.getZoom() >= 3) return;
       /* Earth turns west to east: land moves left to right, so the center longitude goes down */
@@ -464,6 +478,32 @@ function showCard(html, label) {
   card.innerHTML = closeBtn() + html;
   card.setAttribute("aria-label", label);
   card.hidden = false;
+  positionCard();
+}
+/* Card sits next to the selected avatar (right, left, below, above), clear of the panel, feed and zoom, inside the stage.
+   Phone: bottom sheet above the events header. */
+function positionCard() {
+  const S = stage.getBoundingClientRect(), cs = card.style;
+  if (matchMedia("(max-width: 860px)").matches) {
+    const f = feedBox.hidden ? null : feedBox.getBoundingClientRect();
+    const bottom = f ? Math.max(0, S.bottom - f.top) : 0;
+    Object.assign(cs, { left: "0px", right: "0px", top: "auto", bottom: bottom + "px", maxHeight: Math.max(160, S.height - bottom - 56) + "px" });
+    return;
+  }
+  cs.right = cs.bottom = "auto"; cs.maxHeight = S.height - 24 + "px";
+  const m = marks.querySelector(".mk.sel")?.getBoundingClientRect(), w = card.offsetWidth, h = card.offsetHeight, gap = 12;
+  const avoid = [$(".gsum"), feedBox, $(".gzoom")].filter((el) => el && !el.hidden && el.offsetParent).map((el) => el.getBoundingClientRect());
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const fit = (x, y) => [clamp(x, S.left + 8, S.right - w - 8), clamp(y, S.top + 8, S.bottom - h - 8)];
+  const hits = ([x, y]) => avoid.some((r) => x < r.right && x + w > r.left && y < r.bottom && y + h > r.top);
+  const a = m || { left: S.left + S.width / 2, right: S.left + S.width / 2, top: S.top + S.height / 2, bottom: S.top + S.height / 2, width: 0, height: 0 };
+  const mx = a.left + a.width / 2, my = a.top + a.height / 2;
+  const tries = [[a.right + gap, my - h / 2], [a.left - gap - w, my - h / 2], [mx - w / 2, a.bottom + gap], [mx - w / 2, a.top - gap - h]].map(([x, y]) => fit(x, y));
+  /* ponytail: 4 slots then a stage scan in 24px steps; enough for one card */
+  let pos = tries.find((t) => !hits(t));
+  for (let y = S.top + 8; !pos && y < S.bottom - h; y += 24) for (let x = S.left + 8; !pos && x < S.right - w; x += 24) if (!hits([x, y])) pos = [x, y];
+  pos ||= tries[0];
+  cs.left = pos[0] - S.left + "px"; cs.top = pos[1] - S.top + "px";
 }
 function renderCard() {
   const c = state.cities[state.sel];
@@ -587,7 +627,7 @@ new MutationObserver(restyle).observe(root, { attributes: true, attributeFilter:
 
 stage.addEventListener("click", (e) => {
   const mk = e.target.closest(".mk");
-  if (mk) { const ids = mk.dataset.m.split(" ").map(Number); if (ids.length > 1) openGroup(ids); else openCity(ids[0]); return; }
+  if (mk) { if (e.detail && dragged(e)) return; /* detail 0: keyboard */ const ids = mk.dataset.m.split(" ").map(Number); if (ids.length > 1) openGroup(ids); else openCity(ids[0]); return; }
   const pick = e.target.closest(".gcard [data-i]");
   if (pick) { openCity(Number(pick.dataset.i)); return; }
   const t = e.target.closest("[data-t]")?.dataset.t;
@@ -664,15 +704,25 @@ const onResize = () => { clearTimeout(rz); rz = setTimeout(() => { engine?.ready
 addEventListener("resize", onResize);
 document.addEventListener("fullscreenchange", onResize);
 
-/* Auto-spin: one rAF loop, each engine decides when it may turn */
+/* Auto-spin: one rAF loop, each engine decides when it may turn.
+   It pauses while any pointer is down and for 3 s after the last press, wheel or touch. */
+const down = new Set();
+let idleAt = 0;
+const poke = () => { idleAt = performance.now() + 3000; };
+stage.addEventListener("pointerdown", (e) => { down.add(e.pointerId); poke(); if (host.contains(e.target) || marks.contains(e.target)) engine?.halt?.(); }, true);
+for (const t of ["pointerup", "pointercancel"]) addEventListener(t, (e) => { down.delete(e.pointerId); poke(); }, true);
+stage.addEventListener("wheel", poke, { capture: true, passive: true });
+stage.addEventListener("touchstart", poke, { capture: true, passive: true });
+const userBusy = () => down.size > 0 || performance.now() < idleAt;
 let last = performance.now();
 function spin(t) {
   const dt = Math.min(64, t - last); last = t;
   /* hold still under the pointer so a marker does not slide away mid-click */
-  if (engine?.ready && !reduce() && !document.hidden && !marks.querySelector(".mk:hover")) engine.spin(dt);
+  if (engine?.ready && !reduce() && !document.hidden && !userBusy() && !marks.querySelector(".mk:hover")) engine.spin(dt);
   requestAnimationFrame(spin);
 }
 
+Object.defineProperty(window, "__globeEngine", { get: () => engine }); /* read-only hook for browser tests */
 syncTools();
 renderFeed();
 startEngine(state.engine).then(() => requestAnimationFrame(spin));

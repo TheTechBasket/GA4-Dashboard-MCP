@@ -25,6 +25,9 @@ router.get('/api/flag/:cc', apiController.flag);
 /** Latest API quota snapshot */
 router.get('/api/quota', apiController.quotaData);
 
+/** Sites and report names for the navbar jump palette */
+router.get('/api/nav-index', apiController.navIndex);
+
 /** Per-property detail: top countries, sources, pages */
 router.get('/api/property-detail/:propertyId', apiController.propertyDetail);
 

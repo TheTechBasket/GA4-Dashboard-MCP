@@ -116,7 +116,7 @@ Density is high but calm: sharp geometry, a tight neutral scale, one indigo acce
 - One accent (indigo `#4f46e5`), used sparingly: primary actions, active nav state, focus rings, the primary chart series.
 - Sharp, near-flat geometry: 2-3px radii everywhere, no soft/rounded forms.
 - Cards carry no border; elevation is a background-color step, never a shadow, at rest.
-- Full light/dark parity via `light-dark()`, OS preference by default, explicit override via `data-theme`.
+- Full light/dark parity via `light-dark()`. Light is the default; dark is an explicit choice in the settings menu, stored in `localStorage` (`pb_theme`) and applied as `data-theme` by an inline script in `<head>` so there is no flash on load.
 - Self-hosted Inter Variable with tabular numerals on every numeric readout.
 
 ## Colors
@@ -128,10 +128,10 @@ Palette strategy is a tight neutral scale (six steps of surface/border/text per 
 
 ### Neutral
 - **Page** (`light-dark(#f3f3f6, #0b0b0e)`): the body background, one step darker/deeper than any card.
-- **Surface** (`light-dark(#ffffff, #131317)`): cards, inputs, the sidebar rail, popovers.
+- **Surface** (`light-dark(#ffffff, #131317)`): cards, inputs, the command bar, popovers.
 - **Surface Raised** (`light-dark(#f7f7f9, #1a1a1f)`): hover state for surface-level rows and buttons.
 - **Surface Sunken** (`light-dark(#ebebf0, #23232a)`): segmented-control track, skeleton loaders, badge backgrounds.
-- **Border** (`light-dark(#ececf1, #1f1f25)`): hairlines only (table rows, rail edge).
+- **Border** (`light-dark(#ececf1, #1f1f25)`): hairlines only (table rows, command bar bottom edge).
 - **Border Strong** (`light-dark(#dcdce3, #2f2f37)`): input and button strokes, floating-panel edges.
 - **Text Primary** (`light-dark(#18181b, #f4f4f5)`), **Text Muted** (`light-dark(#52525b, #a1a1aa)`), **Text Faint** (`light-dark(#6b6b76, #8e8e99)`): three-step text hierarchy for label/body/caption.
 
@@ -167,7 +167,7 @@ Palette strategy is a tight neutral scale (six steps of surface/border/text per 
 
 Content sits in a centered column, `max-width: 1320px`, with `24px` horizontal padding and `96px` bottom padding for scroll comfort. The spacing scale is `4/8/12/16/20/24/32/40/48px` (`--s1` through `--s12`); component internals use the low end (`--s2`/`--s3`), page rhythm uses the high end (`--s4`/`--s5`/`--s6`).
 
-The shell is a single collapsible sidebar: a 56px icon rail by default, expanding to 216px with labels via `html[data-rail="expanded"]`. Width switches instantly, never animates; only label opacity fades in (`railfade`, 180ms). Below an 860px breakpoint the rail becomes a fixed bottom tab bar with icon+label, safe-area aware. Page content shifts with `padding-left: var(--rail-w)` on desktop and `padding-bottom` on phone; there is no separate top nav bar (`--nav-h: 52px` is reserved for pages that need one).
+The shell is one sticky top command bar (`--nav-h: 52px`): brand mark and page title on the left, a jump box in the middle, page icon links and the settings gear on the right. There is no sidebar and no live count in the bar; live numbers belong to the pages. Content starts directly under the bar. On phones the jump box collapses to its search icon and the bar keeps one row; nothing moves to a hamburger.
 
 ## Elevation & Depth
 
@@ -183,7 +183,7 @@ The one shadow token, `--pop-shadow` (`0 8px 24px -6px rgba(0,0,0,.18), 0 2px 6p
 
 ## Shapes
 
-Radii are sharp and small across the whole system: `2px` for controls and inputs (`--r`, `--r-sm`), `3px` for cards and floating panels (`--r-lg`), `2px` for pills/chips/badges (`--r-pill`, kept sharp rather than fully rounded so "pill" here means shape-of-role, not literal roundness). Borders are reserved for a specific short list: inputs, buttons, floating layers (popovers, tooltips), and table/list hairlines. Cards, page sections, and the sidebar's inner content never take a border for its own sake; the sidebar's one border (`border-right`) is a hairline separating it from content, consistent with the hairline rule.
+Radii are sharp and small across the whole system: `2px` for controls and inputs (`--r`, `--r-sm`), `3px` for cards and floating panels (`--r-lg`), `2px` for pills/chips/badges (`--r-pill`, kept sharp rather than fully rounded so "pill" here means shape-of-role, not literal roundness). Borders are reserved for a specific short list: inputs, buttons, floating layers (popovers, tooltips), and table/list hairlines. Cards, page sections, and the command bar never take a border for its own sake; the bar's one border (`border-bottom`) is a hairline separating it from content, consistent with the hairline rule.
 
 ### Named Rules
 **The Sharp Corners Rule.** Nothing in this system rounds past 3px. A control that looks softly rounded is off-system regardless of context.
@@ -216,11 +216,12 @@ Radii are sharp and small across the whole system: `2px` for controls and inputs
 - **Focus:** `:focus-visible` gets a 2px solid `--accent-fg` outline, 2px offset, shared globally (not input-specific).
 - **Placeholder:** `--text-3`.
 
-### Navigation (Rail / Bottom Tabs)
-- Desktop: fixed 56px icon rail, `--surface` background, single `border-right` hairline. Items are 40px rows, 2px radius, `text-2` at rest, hover to `--surface-2`/`text`. The active item gets `--accent-soft` background and `--accent-fg` text, no border, no underline.
-- Expanded rail (216px): labels fade in with opacity only (`railfade`, 180ms), never a width animation on the label itself, since the rail width switch is instant.
-- Hover on a collapsed item shows a dark tooltip (`--text` background, `--bg` text) offset right, `--pop-shadow`, opacity/transform transition.
-- Phone (≤860px): the rail becomes a fixed bottom tab bar, icon above 10px label, safe-area padding, no tooltips, no expand/collapse control.
+### Navigation (Command bar)
+- **Bar:** 52px, sticky, `--surface` background, one `border-bottom` hairline. Left: brand mark and the page title (Title weight, 14px). No live count, no theme button in the bar.
+- **Jump box:** centered input-styled button (`border-2`, `--surface-2` fill, 32px, max 420px) with a `.kbd` "Ctrl K" hint. Ctrl K (Cmd K on Mac) opens the palette: a floating list (`--pop-shadow`) grouped as Pages, Sites, Reports, filtered as you type, arrow keys plus Enter, Esc closes.
+- **Page links:** 32px icon buttons, `text-2` at rest, hover `--surface-2`. The active page gets `--accent-soft` background and `--accent-fg` icon, no border, no underline. Each has a hover tooltip and an `aria-label`.
+- **Settings gear:** opens a small popover menu. It holds Theme (Light / Dark, checked item marked) and a muted GA4 quota line (from `/api/quota`, hidden when empty), and is the home for future settings; add new preferences here, not as more bar buttons.
+- **Phone (640px and below):** the jump box shrinks to its icon, the bar stays one row, icon links stay visible.
 
 ### Segmented Control
 - **Style:** `--surface-3` track, 2px outer padding, transparent buttons at 28px height (40px touch) with `--r-sm` inner radius. Selected segment gets `--surface` background and `text` color; transitions on background/color only.
@@ -228,7 +229,7 @@ Radii are sharp and small across the whole system: `2px` for controls and inputs
 ### Chart Fill (signature)
 The line charts (live traffic, trend sparklines) render an SVG line (`.ln`) over an area that is, by default, an **ordered dither**: horizontal mask-repeated bands (`.dz i`, CSS `mask-repeat`) clipped under the area polygon, rather than a gradient or flat fill (`html[data-fx="dither"]`). A flat semi-transparent fill (`.ar`, 14% opacity) is the fallback when dither is toggled off. This is a deliberate, user-approved ("dither looks really cool") signature texture, not a decorative default; it stays confined to chart area fills and must not spread to card backgrounds or other surfaces.
 
-**Map tokens (map-only exception, like the dither fill).** `/globe` defines `--sea --land --landline --grat --space --halo --indline` as plain values in `views/globe.hbs` (the canvas engine reads them with `getComputedStyle`). Minimal is calm neutral; Outdoors is vivid (sea `#4a9fd8`/`#0b3a5e`, land `#9cd08a`/`#24502f`), and the MapLibre globe or Outdoors sits on a `#05070d` space backdrop. Avatar markers carry a 2px white ring. These values stay inside the map stage and never reach panels or other pages.
+**Map tokens (map-only exception, like the dither fill).** `/globe` defines `--sea --land --landline --grat --space --halo --indline` as plain values in `views/globe.hbs` (the canvas engine reads them with `getComputedStyle`). Minimal is calm neutral; Outdoors is vivid (sea `#4a9fd8`/`#0b3a5e`, land `#9cd08a`/`#24502f`), and the MapLibre globe or Outdoors sits on a `#05070d` space backdrop. Avatar markers are a uniform 48px with a 2px white ring; nearby cities merge into one stack marker, and a click on a city or a stack opens the same detail card (variant A) next to the marker. Country flags come from `/api/flag/:cc` (Iconify 4x3 SVG, cached in `.data/flags/`); an unknown country shows a neutral tile and `--`. These values stay inside the map stage and never reach panels or other pages.
 
 ## Do's and Don'ts
 
@@ -245,6 +246,6 @@ The line charts (live traffic, trend sparklines) render an SVG line (`.ln`) over
 ### Don't:
 - **Don't** add a border to a card, page section, or other in-flow surface. Borders are for inputs, buttons, floating layers, and hairlines only.
 - **Don't** introduce a second accent color or a decorative gradient; one indigo, held in reserve, is the whole strategy.
-- **Don't** animate width, height, or layout-affecting properties for the sidebar or any panel; the rail switches width instantly and fades only labels.
+- **Don't** animate width, height, or layout-affecting properties for the command bar, popovers or any panel; menus and the palette fade and shift with opacity/transform only.
 - **Don't** switch typefaces for hierarchy. Inter Variable's weight axis does that job; there is no separate display or mono-for-headings face.
 - **Don't** round corners past 3px, or use a fully circular "pill" shape for chips/badges; this system's pill token is 2px, deliberately sharp.

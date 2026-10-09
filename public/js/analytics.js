@@ -209,6 +209,22 @@
       '<section class="card" id="card-dow"><div class="card-h"><h3>Day of week</h3></div><div class="card-b">' + skel() + '</div></section>';
   }
 
+  /* #card-<type> (navbar jump palette): scroll the card under the sticky navbar and keep it
+     there while cards above it load, until the user scrolls or presses a key. */
+  let jumpHold = false;
+  function jumpToHash(start) {
+    const m = /^#card-([\w-]+)$/.exec(location.hash);
+    if (!m) return;
+    const el = m[1] === 'new-users-by-date' ? $('anTrend').closest('section') : $('card-' + m[1]);
+    if (!el) return;
+    if (start) jumpHold = true;
+    if (!jumpHold) return;
+    const nav = document.getElementById('appNav');
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - (nav ? nav.offsetHeight : 0) - 16 });
+  }
+  ['wheel', 'touchstart', 'keydown'].forEach(ev => addEventListener(ev, () => { jumpHold = false; }, { passive: true }));
+  addEventListener('hashchange', () => jumpToHash(true));
+
   async function loadCard(type, seg, fresh) {
     const id = loadId;
     const el = $('card-' + type);
@@ -242,6 +258,7 @@
     if (type === 'page-paths') renderSums();
     if (TABLE_CHANGES[type] || type === 'bot-traffic') renderChanges();
     renderFresh();
+    jumpToHash();
   }
 
   /* Strip sums */
@@ -428,11 +445,12 @@
     $('anRange').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.range === range)));
     $('anProp').value = prop;
     $('anGa4').href = `https://analytics.google.com/analytics/web/#/p${encodeURIComponent(prop)}/reports/reportinghub`;
-    history.replaceState(null, '', `${location.pathname}?prop=${encodeURIComponent(prop)}&range=${range}`);
+    history.replaceState(null, '', `${location.pathname}?prop=${encodeURIComponent(prop)}&range=${range}${location.hash}`);
     $('anTrend').innerHTML = skel();
     $('anSums').innerHTML = '';
     $('anChg').innerHTML = '<li>' + skel() + '</li>';
     buildGrid();
+    jumpToHash(true);
     renderFresh();
     loadCard('new-users-by-date', undefined, fresh);
     GRID.forEach(c => loadCard(c.type, undefined, fresh));
