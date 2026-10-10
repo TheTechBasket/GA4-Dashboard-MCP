@@ -3,17 +3,20 @@
 All notable changes to this project are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
-## [2.0.0] - 2026-10-09
+## [2.0.0] - 2026-10-10
 
 ### Added
 
 - Demo mode (`pnpm demo` or `DEMO=1`): generated data for 8 fictional sites, no Google account needed. A "Demo data" badge shows in the bar.
-- `/setup` page: until credentials work, every page opens it. It has a prompt for your AI agent and a live checklist that moves on as each step passes.
+- `/setup` page: until credentials work, every page opens it. It has a prompt for your AI agent, a live checklist that moves on as each step passes, and the manual steps as a stepper with screenshots. Commands match how you run the app (pnpm or Docker).
 - `pnpm setup:check`: checks the credentials from the terminal. Exit codes tell you which step failed.
 - `GET /healthz` for uptime checks and the Docker health check.
-- Docker image (`node:22-alpine`, runs as a non-root user, health check) and `docker-compose.yml`.
+- Docker image (`node:22-alpine`, about 222 MB, runs as a non-root user, health check, port 5483) and `docker-compose.yml`, which publishes the port on `127.0.0.1` only.
 - Release workflow: a `v*` tag builds a multi-arch image (amd64, arm64) to GHCR and creates a GitHub release from this file.
-- Home cards: per-minute charts, Open GA4 / Report / Visit site actions and an adjustable spike rule (z-score against a same-hour baseline).
+- Home cards: per-minute charts and Open GA4 / Report / Visit site actions.
+- Home live strip: a mini globe with live visitor dots that spins to the busiest city.
+- Spike rule you can adjust in Settings > Spike rule. Spike alerts on Home can be collapsed, and the browser remembers the state.
+- README: private access with Cloudflare Tunnel plus Access, or Tailscale.
 - Report page extras: referrers by platform, source and medium split, suspected bot traffic, revenue and key events.
 - Globe: day and night shade, local time on city cards, country flags from `/api/flag/:cc` (cached in `.data/flags`), site favicons (cached in `.data/favicons`).
 
@@ -24,10 +27,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Globe rebuilt on MapLibre (OpenFreeMap tiles) with a canvas fallback. Every map uses India's official boundary (Natural Earth 10m India POV).
 - Analytics page rebuilt: trend chart, what changed, deltas against the previous period.
 - Top navigation is a command bar: Ctrl K jump box, page icons, settings menu with theme and GA4 quota. Light theme by default.
-- Spike detection uses the usual busiest half hour over 7 days as its baseline, so normal peak hours no longer show as spikes.
+- Spike detection compares live users with the same hour on past days (z-score), so normal peak hours no longer show as spikes. When the property time zone is unknown, it falls back to the usual busiest half hour over 7 days.
 - Report stats use GA4 totals. Failed time zone lookups are retried.
 - Inter Variable is self-hosted (`public/fonts`). The app makes no Google Fonts requests.
-- `ts-node` and `typescript` moved to `dependencies`, because the app loads `.ts` files at run time.
+- TypeScript controllers compile at build time (`pnpm build`), so the Docker image has no TypeScript tooling.
+- The app is named GA4 Dashboard (interim name).
+
+### Fixed
+
+- Inline JSON in pages escapes `<`, so data cannot close the script tag.
+- Favicon fetches check every redirect hop, not only the first URL.
+- Spike totals no longer count a user once per page viewed.
 
 ### Removed
 
