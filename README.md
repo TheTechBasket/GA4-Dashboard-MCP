@@ -4,6 +4,8 @@ Real-time Google Analytics 4 (GA4) dashboard with a live globe, traffic spike de
 
 ![GA4 Dashboard globe: live visitors as avatars, top countries and sites, and the live event feed](docs/screenshots/globe.webp)
 
+**Watch the 48 second demo on YouTube:** https://youtu.be/bZbx4_8PIXE
+
 <details>
 <summary>More screenshots</summary>
 
