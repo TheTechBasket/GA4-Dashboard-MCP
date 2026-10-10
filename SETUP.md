@@ -27,6 +27,8 @@ If you have browser tools (Claude in Chrome, Playwright or similar), ask me once
 - Do step 7 yourself in GA4 Admin, then tell me what you added.
 I must sign in to Google myself; never type my password.
 
+Docker: if the app runs in a container, step 6 is: docker compose up -d (it reloads .env), then docker compose exec dashboard node scripts/setup-check.js.
+
 Rules: never print the private key, never commit .env.
 If you cannot run shell commands or a browser, give me these steps one at a time with the exact console links, and wait for me after each one.
 ```
@@ -35,14 +37,14 @@ If you cannot run shell commands or a browser, give me these steps one at a time
 ## By hand
 
 <!-- manual:start -->
-1. Open [console.cloud.google.com](https://console.cloud.google.com/) and create a project (no billing needed).
-2. APIs and Services, Library: enable Google Analytics Data API and Google Analytics Admin API.
-3. IAM and Admin, Service Accounts: create one named ga4-dashboard (no roles needed).
-4. Keys tab: Add key, JSON. A file downloads.
-5. Copy client_email and private_key from that file into .env as GA4_CLIENT_EMAIL and GA4_PRIVATE_KEY.
-6. Run pnpm setup:check. When it passes, delete the downloaded file.
-7. In GA4 Admin, Account access management, add the client email as Viewer.
-8. Come back to the setup page. It moves on by itself.
+1. **Create a project.** Open [New Project](https://console.cloud.google.com/projectcreate), give it a name (for example ga4-dash) and click Create. No billing needed.
+2. **Turn on the APIs.** Open [Google Analytics Data API](https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com) and click Enable. Do the same for [Google Analytics Admin API](https://console.cloud.google.com/apis/library/analyticsadmin.googleapis.com).
+3. **Create a service account.** Open [Create service account](https://console.cloud.google.com/iam-admin/serviceaccounts/create), name it ga4-dashboard and click Create and close. Skip the optional steps.
+4. **Download a key.** Open the new account, Keys tab: Add key, Create new key, JSON, Create. A file downloads.
+5. **Fill .env.** Copy `client_email` and `private_key` from that file into `.env` as `GA4_CLIENT_EMAIL` and `GA4_PRIVATE_KEY`. Keep the private key in double quotes with its `\n`.
+6. **Check the key.** Run `pnpm setup:check`. When it passes, delete the downloaded file.
+7. **Give access in GA4.** In [GA4 Admin](https://analytics.google.com/analytics/web/#/admin), Account access management: click +, Add users, paste the client email, choose Viewer and click Add.
+8. **Done.** Come back to this page. It moves on by itself.
 <!-- manual:end -->
 
 `pnpm setup:check` exit codes: 0 connected, 1 `.env` values missing, 2 key rejected by Google, 3 no GA4 properties visible yet, 4 GA4 request failed (for example an API is not enabled).

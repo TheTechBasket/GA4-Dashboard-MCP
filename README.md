@@ -50,8 +50,8 @@ Full steps, the agent prompt and the manual path: [SETUP.md](SETUP.md).
 ### Quick start
 
 ```bash
-git clone https://github.com/TheTechBasket/GA4_report.git
-cd GA4_report
+git clone https://github.com/TheTechBasket/GA4-Dashboard-MCP.git
+cd GA4-Dashboard-MCP
 pnpm install
 cp .env.example .env
 pnpm start
@@ -172,4 +172,4 @@ Distributed under the [MIT License](LICENSE). See `LICENSE` for more information
 
 **Amit Yadav**
 - GitHub: [@TheTechBasket](https://github.com/TheTechBasket)
-- Repository: [https://github.com/TheTechBasket/GA4_report](https://github.com/TheTechBasket/GA4_report)
+- Repository: [https://github.com/TheTechBasket/GA4-Dashboard-MCP](https://github.com/TheTechBasket/GA4-Dashboard-MCP)

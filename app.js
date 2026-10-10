@@ -103,6 +103,9 @@ const setup = require('./lib/setupCheck');
 setup.onCredentialsChange(resetClients);
 const SETUP_DOC = require('./lib/setupDoc').loadSetupDoc();
 const { version: APP_VERSION } = require('./package.json');
+const DOCKER_IMAGE = 'ghcr.io/thetechbasket/ga4-dashboard:latest';
+// Screenshot per manual step (public/img/setup/*.webp), by step index; redacted placeholder values only
+const STEP_SHOTS = { 0: ['s1-project', 'New Project form'], 1: ['s2-enable-api', 'Google Analytics Data API page with the Enable button'], 2: ['s3-service-account', 'Create service account form'], 3: ['s4-keys', 'Keys tab with the Add key menu open'], 6: ['s7-viewer', 'GA4 Add roles panel with Viewer selected'] };
 
 // Navbar: page title and active icon from the path (views/partials/navbar.hbs)
 const NAV_PAGES = { '/': 'Dashboard', '/globe': 'Globe', '/analytics': 'Analytics', '/setup': 'Setup' };
@@ -124,15 +127,24 @@ app.get('/api/setup/status', async (req, res) => {
 });
 
 app.get('/setup', (req, res) => {
-	const mcp = SETUP_DOC.mcp.split('<project folder>').join(__dirname);
+	// Docker: the host folder is unknown and pnpm is not there, so show docker commands
+	const docker = !!process.env.IN_DOCKER;
+	const mcp = docker
+		? SETUP_DOC.mcp.split('node <project folder>/mcp-server/index.js').join(`docker run --rm -i --env-file <folder with your .env>/.env ${DOCKER_IMAGE} node mcp-server/index.js`).split('<project folder>').join('<folder with your .env>')
+		: SETUP_DOC.mcp.split('<project folder>').join(__dirname);
 	res.render('setup', {
 		head: { title: 'GA4 Dashboard · Setup', description: 'Connect Google Analytics and use it with AI', image: '', url: '' },
 		prompt: SETUP_DOC.prompt,
-		manual: SETUP_DOC.manual,
+		manual: SETUP_DOC.manual.map((m, i) => ({
+			html: docker ? m.split('pnpm setup:check').join('docker compose up -d, then docker compose exec dashboard node scripts/setup-check.js') : m,
+			shot: STEP_SHOTS[i]?.[0], alt: STEP_SHOTS[i]?.[1],
+		})),
 		mcpPrompt: mcp,
 		psi: !!process.env.PSI_API_KEY,
 		gaAdminUrl: setup.GA4_ADMIN_URL,
 		projectDir: __dirname,
+		docker,
+		dockerImage: DOCKER_IMAGE,
 	});
 });
 

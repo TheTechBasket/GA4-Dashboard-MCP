@@ -22,11 +22,13 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 
 FROM node:22-alpine
 WORKDIR /app
-ENV NODE_ENV=production PORT=5483
+# IN_DOCKER=1: the /setup page shows docker commands instead of pnpm ones
+ENV NODE_ENV=production PORT=5483 IN_DOCKER=1
 COPY --from=deps /app/node_modules ./node_modules
 # Runtime files only: no docs, screenshots, tests or dev config.
 COPY package.json app.js SETUP.md ./
 COPY lib lib
+COPY scripts/setup-check.js scripts/
 COPY routes routes
 COPY views views
 COPY public public

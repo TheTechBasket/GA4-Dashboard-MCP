@@ -52,6 +52,11 @@ describe("SETUP.md blocks", () => {
         const d = parseSetupDoc("<!-- manual:start -->\n1. Open [x](https://e.com) <b>\n<!-- manual:end -->");
         expect(d.manual[0]).to.equal('Open <a href="https://e.com" target="_blank" rel="noopener">x</a> &lt;b&gt;');
     });
+
+    it("turns **bold** and `code` into tags", () => {
+        const d = parseSetupDoc("<!-- manual:start -->\n1. **Fill .env.** Run `pnpm setup:check`\n<!-- manual:end -->");
+        expect(d.manual[0]).to.equal("<b>Fill .env.</b> Run <code>pnpm setup:check</code>");
+    });
 });
 
 // Boots the app with blank credentials (shell values win over .env) and checks the gate.

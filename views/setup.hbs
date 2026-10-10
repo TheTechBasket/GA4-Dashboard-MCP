@@ -15,6 +15,21 @@
   .su summary { cursor: pointer; width: fit-content; font-size: .8125rem; font-weight: 500; color: var(--text-2); }
   .su summary:hover { color: var(--text); }
   .su ol { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: .8125rem; color: var(--text-2); }
+  /* Step screenshots: native popover (Esc and outside click close it) */
+  .su ol.su-steps { list-style: none; counter-reset: st; padding: 0; gap: 0; }
+  .su-steps li { counter-increment: st; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px 10px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .su-steps li:last-child { border-bottom: 0; padding-bottom: 0; }
+  .su-steps li::before { content: counter(st); grid-row: span 2; width: 18px; height: 18px; margin-top: 1px; border-radius: var(--r); display: grid; place-items: center; font: 600 11px/1 var(--font); background: var(--surface-3); color: var(--text-3); }
+  .su-steps b { display: block; font-weight: 500; color: var(--text); }
+  .su-thumb { width: min(100%, 340px); padding: 0; border: 1px solid var(--border-2); border-radius: var(--r); background: var(--surface-2); overflow: hidden; cursor: zoom-in; }
+  .su-thumb img { display: block; width: 100%; height: auto; transition: transform .16s var(--ease-out); }
+  @media (hover: hover) and (pointer: fine) { .su-thumb:hover img { transform: scale(1.02); } }
+  .su-shot { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 8px; border: 1px solid var(--border-2); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--pop-shadow); overflow: auto; opacity: 0; transform: scale(.97); transition: opacity .16s var(--ease-out), transform .16s var(--ease-out), overlay .16s allow-discrete, display .16s allow-discrete; }
+  .su-shot:popover-open { opacity: 1; transform: none; }
+  @starting-style { .su-shot:popover-open { opacity: 0; transform: scale(.97); } }
+  .su-shot::backdrop { background: rgba(0, 0, 0, .35); }
+  .su-shot img { display: block; width: 100%; height: auto; border-radius: var(--r); }
+  .su-shot .btn { position: absolute; top: 12px; right: 12px; background: var(--surface); }
   .su a:not(.btn) { color: var(--accent-fg); text-decoration: underline; text-underline-offset: 2px; }
 
   /* Checklist */
@@ -55,8 +70,13 @@
     <div class="su-demo">
       <button type="button" class="btn" id="demoBtn" aria-expanded="false" aria-controls="demoCmd">Try demo data</button>
       <div class="su-demo-cmd" id="demoCmd" hidden>
+        {{#if docker}}
+        <span>Start a second container</span><code>docker run --rm -e DEMO=1 -p 127.0.0.1:5484:5483 {{dockerImage}}</code>
+        <button type="button" class="btn btn-sm" data-copy="docker run --rm -e DEMO=1 -p 127.0.0.1:5484:5483 {{dockerImage}}">Copy</button>
+        {{else}}
         <span>Stop the app, then run</span><code>pnpm demo</code>
         <button type="button" class="btn btn-sm" data-copy="pnpm demo">Copy</button>
+        {{/if}}
       </div>
     </div>
   </div>
@@ -71,11 +91,17 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="1"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>
             <span>Copy prompt</span>
           </button>
+          {{#if docker}}
+          <span class="faint small">Run it in the folder with your <code>.env</code> (a clone of the repo works best). The container reads <code>.env</code> only at start: after each change run <code>docker compose up -d</code> (with plain <code>docker run</code>, remove the container and run it again).</span>
+          {{else}}
           <span class="faint small">Run it from <code>{{projectDir}}</code></span>
+          {{/if}}
         </div>
         <details>
           <summary>No agent? Do it by hand</summary>
-          <ol>{{#each manual}}<li>{{{this}}}</li>{{/each}}</ol>
+          <ol class="su-steps">{{#each manual}}<li><div>{{{this.html}}}</div>{{#if this.shot}}
+            <button type="button" class="su-thumb" popovertarget="shot{{@index}}" aria-label="Enlarge screenshot: {{this.alt}}"><img src="/img/setup/{{this.shot}}.webp" alt="{{this.alt}}" loading="lazy"></button>
+            <div popover id="shot{{@index}}" class="su-shot"><img src="/img/setup/{{this.shot}}.webp" alt="{{this.alt}}" loading="lazy"><button type="button" class="btn btn-ghost btn-icon" popovertarget="shot{{@index}}" popovertargetaction="hide" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>{{/if}}</li>{{/each}}</ol>
         </details>
       </div>
     </section>
@@ -135,7 +161,7 @@
     <div class="su-head">
       <div>
         <h1 id="aiH">Use with AI</h1>
-        <p class="muted">The MCP server in <code>mcp-server/</code> reads the same <code>.env</code> and needs no second install. Start it with <code>pnpm mcp</code>, or let your AI tool start it.</p>
+        <p class="muted">The MCP server in <code>mcp-server/</code> reads the same <code>.env</code> and needs no second install. {{#if docker}}Your AI tool starts it with the command below.{{else}}Start it with <code>pnpm mcp</code>, or let your AI tool start it.{{/if}}</p>
       </div>
     </div>
     <div class="su-split">
@@ -169,7 +195,7 @@
             {{else}}
             <li data-state="wait"><span class="su-dot" aria-hidden="true">&middot;</span><div><b>PageSpeed</b><div class="su-sub">run_pagespeed_insights. Needs PSI_API_KEY in .env (optional)</div></div><span class="badge">Off</span></li>
             {{/if}}
-            <li data-state="ok"><span class="su-dot" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><div><b>Indexing requests</b><div class="su-sub">request_indexing. Works for sites where the service account is an Owner in Search Console</div></div><span></span></li>
+            <li data-state="ok"><span class="su-dot" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><div><b>Indexing requests</b><div class="su-sub">request_indexing. Needs the Web Search Indexing API enabled and the service account as an Owner in Search Console</div></div><span></span></li>
             <li data-state="ok"><span class="su-dot" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><div><b>Cache and quota</b><div class="su-sub">get_cache_status, get_rate_limit_status</div></div><span></span></li>
           </ul>
           <p class="faint small">Uses the same Google Cloud project and GA4 quota as the dashboard.</p>
