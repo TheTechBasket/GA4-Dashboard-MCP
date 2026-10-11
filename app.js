@@ -9,10 +9,10 @@ try {
 const express = require('express');
 const exphbs = require('express-handlebars');
 const cors = require('cors');
-const morgan = require('morgan');
 const path = require('path');
 
 require('dotenv').config();
+const log = require('./lib/log');
 
 
 /* Express server */
@@ -45,7 +45,7 @@ if (process.env.NODE_ENV === 'development') {
         // Inject livereload script tag into all HTML responses
         app.use(connectLivereload());
 
-        console.log('   🔄 LiveReload active, watching views/ and public/');
+        console.log('[livereload] Watching views/ and public/');
     } catch (err) {
         console.warn('[livereload] Not available, run: npm install --save-dev livereload connect-livereload');
     }
@@ -60,9 +60,8 @@ app.use(express.static('public'));
 
 
 if (process.env.NODE_ENV === 'development') {
-	app.use(morgan('dev'));
+	app.use(log.requests);
 	app.locals.baseurl = 'http://localhost:5483';
-	console.log('development mode');
 }
 
 // Templating Engine
@@ -173,12 +172,18 @@ app.locals.demo = require('./controllers/demoData').enabled();
 /* Express Server Listening */
 const port = process.env.PORT || 5483;
 app.listen(port, () => {
-	const serverUrl = `http://localhost:${port}`;
-	console.log(`\n🚀 GA4 Dashboard server running!`);
-	console.log(`   ➜ Local Dashboard: ${serverUrl}`);
-	console.log(`   ➜ 3D Globe View:   ${serverUrl}/globe`);
-	console.log(`   ➜ Analytics View:  ${serverUrl}/analytics\n`);
-	if (app.locals.demo) console.log('   Demo mode: generated data, no GA4 calls\n');
+	const dev = process.env.NODE_ENV === 'development';
+	log.banner({
+		name: 'GA4 Dashboard',
+		version: APP_VERSION,
+		url: `http://localhost:${port}`,
+		mode: app.locals.demo ? { label: 'demo', style: 'yellow' } : dev ? { label: 'development', style: 'magenta' } : { label: 'production', style: 'green' },
+		links: [['Dashboard', '/'], ['Globe', '/globe'], ['Analytics', '/analytics'], ['Setup', '/setup'], ['Health', '/healthz']],
+		notes: [
+			app.locals.demo && 'Demo mode: generated data, no GA4 calls',
+			!app.locals.demo && !isConfigured() && 'GA4 credentials missing: open /setup',
+		].filter(Boolean),
+	});
 
 	// Warm country metadata cache in background (restcountries.com → .cache/countries.json)
 	const { warmCountriesCache } = require('./controllers/countriesCache');
@@ -190,7 +195,7 @@ app.listen(port, () => {
 	// Immediate startup cleanup
 	cacheCleanup().then(cleaned => {
 		if (cleaned > 0) {
-			console.log(`   🧹 Report cache: cleaned ${cleaned} stale file(s)`);
+			console.log(`[cache] Cleaned ${cleaned} stale report file(s)`);
 		}
 	}).catch(() => {});
 
