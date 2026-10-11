@@ -164,6 +164,12 @@ pnpm build  # TypeScript compilation check
 
 ---
 
+## Contributing
+
+Open an issue first and wait for the `approved` label, then send one pull request per feature or fix. Full rules: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
 ## License
 
 Distributed under the [MIT License](LICENSE). See `LICENSE` for more information.
