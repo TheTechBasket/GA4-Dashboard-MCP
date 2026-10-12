@@ -360,7 +360,7 @@ export function getCityCoords(city: string): LatLng | null {
 
 /**
  * Async city lookup that falls back to the country's capital coordinates
- * (from restcountries.com cache) when the city is not in the static table.
+ * (from the bundled country list) when the city is not in the static table.
  *
  * @param city     City name as returned by GA4 (e.g. "Hyderabad")
  * @param countryId  ISO 3166-1 alpha-2 country code (e.g. "IN")

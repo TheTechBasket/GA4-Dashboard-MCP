@@ -428,10 +428,37 @@
     const head = ['Dimension', ...((d && d.metricHeaders) || []).map(metricLabel)].map(q).join(',');
     download([head, ...csvRows(type).map(([dim, ...m]) => [q(dim), ...m.map(x => x[1])].join(','))], card ? card.title : type);
   }
-  function exportAll() {
+  // Export all: fetch the cards not scrolled into view yet first (served from the 1 h cache when warm).
+  async function exportAll() {
+    await Promise.all(GRID.filter(c => !store[c.type]).map(c => loadCard(c.type)));
     const lines = ['Card,Dimension,Metric,Value'];
     CARDS.forEach(c => csvRows(c.type).forEach(([dim, ...m]) => m.forEach(([k, v]) => lines.push([q(c.title), q(dim), q(k), v].join(',')))));
     download(lines, 'analytics-export');
+  }
+
+  /* On open, fetch only what the first screen shows: the trend, the cards behind the summary and
+     "What changed" lists, and the live strip. Other cards, the spikes list and day of week load
+     when they come within 300 px of the viewport. */
+  const EAGER = new Set(['new-users-by-date', 'page-paths', 'bot-traffic', ...Object.keys(TABLE_CHANGES)]);
+  let lazyObs = null;
+  function lazyLoad(fresh) {
+    if (lazyObs) lazyObs.disconnect();
+    const done = new Set();
+    const load = (key) => {
+      if (done.has(key)) return;
+      done.add(key);
+      return key === 'reports' ? loadReports(fresh) : loadCard(key, undefined, fresh);
+    };
+    const later = GRID.map(c => c.type).filter(t => !EAGER.has(t));
+    [...EAGER].forEach(load);
+    if (!('IntersectionObserver' in window)) { later.forEach(load); load('reports'); return; }
+    lazyObs = new IntersectionObserver((hits, obs) => hits.forEach(h => {
+      if (!h.isIntersecting) return;
+      obs.unobserve(h.target);
+      load(h.target.dataset.lazy);
+    }), { rootMargin: '300px 0px' });
+    later.forEach(t => { const el = $('card-' + t); if (el) { el.dataset.lazy = t; lazyObs.observe(el); } });
+    [$('anSpikes'), $('card-dow')].forEach(el => { el.dataset.lazy = 'reports'; lazyObs.observe(el); });
   }
 
   /* Load everything for the current property and range */
@@ -452,9 +479,8 @@
     buildGrid();
     jumpToHash(true);
     renderFresh();
-    loadCard('new-users-by-date', undefined, fresh);
-    GRID.forEach(c => loadCard(c.type, undefined, fresh));
-    loadReports(fresh);
+    $('anSpikes').innerHTML = skel();
+    lazyLoad(fresh);
     loadLive();
     clearInterval(liveTimer);
     liveTimer = setInterval(loadLive, 60000);

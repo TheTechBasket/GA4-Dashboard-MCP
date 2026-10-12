@@ -1,5 +1,5 @@
 // Simple per-API-family token bucket. Requests over the limit are delayed
-// (queued), never dropped — that's the "throttle automatically" behavior.
+// (queued), never dropped: that's the "throttle automatically" behavior.
 const LIMITS = {
 	admin: Number(process.env.RATE_LIMIT_ADMIN_RPS) || 2,
 	data: Number(process.env.RATE_LIMIT_DATA_RPS) || 8,
@@ -47,19 +47,31 @@ async function acquire(family) {
 	}
 }
 
-const RETRYABLE_CODES = new Set([8, 14]); // RESOURCE_EXHAUSTED, UNAVAILABLE
+const httpStatus = (err) => err?.status ?? err?.response?.status ?? (err?.code >= 400 ? err.code : undefined);
 
-/** Throttles to the family's RPS, then calls fn with backoff retry on quota errors. */
-async function withRateLimit(family, fn, { maxRetries = 3 } = {}) {
+/**
+ * Whether a failed call is worth one retry. GA4 RESOURCE_EXHAUSTED (8) means tokens are gone unless
+ * it is about concurrent requests, so only that case retries. UNAVAILABLE (14) and HTTP 500/503 retry
+ * once (Google allows only 10 server errors per project per hour). PSI maps its 429 to 8: retry once.
+ */
+function shouldRetry(family, err) {
+	if (err?.code === 8) return family === "psi" || /concurren/i.test(err.message || "");
+	if (err?.code === 14) return true;
+	const status = httpStatus(err);
+	return status === 500 || status === 503;
+}
+
+/** Throttles to the family's RPS, then calls fn, retrying once on the errors shouldRetry allows. */
+async function withRateLimit(family, fn, { maxRetries = 1, baseMs = 500 } = {}) {
 	await acquire(family);
 	let attempt = 0;
 	while (true) {
 		try {
 			return await fn();
 		} catch (err) {
-			if (!RETRYABLE_CODES.has(err.code) || attempt >= maxRetries) throw err;
-			const backoffMs = 500 * 2 ** attempt + Math.random() * 200;
-			console.error(`[rate-limit] ${family} hit code ${err.code}, retrying in ${Math.round(backoffMs)}ms`);
+			if (!shouldRetry(family, err) || attempt >= maxRetries) throw err;
+			const backoffMs = baseMs * 2 ** attempt + Math.random() * (baseMs * 0.4);
+			console.error(`[rate-limit] ${family} hit code ${err.code ?? httpStatus(err)}, retrying in ${Math.round(backoffMs)}ms`);
 			await sleep(backoffMs);
 			attempt += 1;
 		}
@@ -78,4 +90,4 @@ function status() {
 	return out;
 }
 
-module.exports = { withRateLimit, status };
+module.exports = { withRateLimit, shouldRetry, status };

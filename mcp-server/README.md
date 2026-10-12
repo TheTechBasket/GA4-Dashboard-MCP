@@ -37,14 +37,14 @@ config holds just the command, never the key.
 | `get_account_summaries` | All GA4 accounts + properties visible to the credentials |
 | `get_property_details` | Display name, timezone, currency, etc. for one property |
 | `list_google_ads_links` | Google Ads accounts linked to a property |
-| `run_report` | Core report: dimensions x metrics over a date range, with optional `orderBys` (sort server-side, e.g. top pages by revenue, instead of pulling every row and sorting client-side) |
+| `run_report` | Core report: dimensions x metrics over a date range, with `orderBys`, `limit`/`offset` and `dimensionFilter(s)` so filtering and sorting happen server-side |
 | `run_funnel_report` | Step-by-step funnel completion over a date range |
 | `get_custom_dimensions_and_metrics` | Custom dimensions/metrics defined on a property |
 | `run_realtime_report` | Active users right now, last up to 30 minutes |
 | `run_pagespeed_insights` | Lighthouse scores + Core Web Vitals for one URL: needs `PSI_API_KEY` |
 | `request_indexing` | Ask Google to recrawl a URL after a deploy: needs Search Console owner access, see below |
 | `get_cache_status` | What's cached, how old, still fresh? (no API call) |
-| `get_rate_limit_status` | Current local throttle tokens per API family (no API call) |
+| `get_rate_limit_status` | GA4 quota left per property and pool, plus local throttle state (no GA4 tokens) |
 
 Search Console *data* (queries, clicks, impressions) is intentionally not
 duplicated here: use the existing SEO Gets MCP for that. This server only
@@ -73,17 +73,38 @@ To enable it per site: Search Console → that property → Settings → Users a
 permissions → Add user → paste the service account email above → **Owner**.
 Do this for each domain you want `request_indexing` to work on.
 
-## Rate limiting
+## Rate limiting and quota
 
-Each API family (`admin`, `data`, `realtime`, `alpha`/funnel, `psi`, `indexing`)
-has its own local token bucket (defaults: 2/8/4/2/1/0.1 req/sec: override via
-`RATE_LIMIT_*_RPS` env vars). `indexing` defaults to 1 request every 10s as a
-burst guard: Google's real cap there is ~200/day, not a per-second rate, and
-this server doesn't track that daily count locally. Calls that exceed it are queued and delayed,
-never dropped. On top of that, every `run_report` / `run_realtime_report`
-response includes Google's own live `quota` object (tokens left today/this
-hour, from `returnPropertyQuota: true`): that's the authoritative number,
-the local bucket is just a safety throttle.
+GA4 counts tokens per property per pool (core, realtime, funnel): 200k/day,
+40k/hour, and 14k per hour for the whole GCP project. The dashboard uses the
+same project, so both write Google's `propertyQuota` to one shared ledger
+(`.data/quota-ledger.json`, override with `QUOTA_LEDGER_FILE`). Every GA4
+result carries `quota: {cost, projectHourLeft, hourLeft, dayLeft, status}`;
+`get_rate_limit_status` shows the ledger without spending tokens.
+
+On a cache miss, each GA4 call passes these checks in order (a cache hit skips them):
+
+1. **Report caps** (`run_report`): max 4 dimensions, 6 metrics, limit 250,
+   93-day range. `pagePath`, `pageLocation`, `pageTitle`, `landingPage*`,
+   `customEvent:*`, `customUser:*` need `orderBys` and limit 50 or less.
+   Refusal: `report_too_big`.
+2. **Property spread**: more than `MCP_MAX_PROPERTIES_PER_WINDOW` (3) distinct
+   properties in `MCP_PROPERTY_WINDOW_MIN` (10) minutes is refused
+   (`too_many_properties`). A property already in the window always passes.
+3. **Quota gate**: when the ledger says the pool is `low` (project-hour under
+   `QUOTA_RESERVE_PROJECT_HOUR_PCT` 30%, hour under `QUOTA_RESERVE_HOUR_PCT`
+   20%, day under `QUOTA_RESERVE_DAY_PCT` 20%) or `critical` (under 10%), the
+   call is refused with `quota_low` and a `retryAfter`, so the dashboard keeps
+   its share.
+4. **Concurrency**: at most `MCP_MAX_INFLIGHT_PER_PROPERTY` (3) calls per
+   property at once; the rest queue.
+5. **Local throttle**: one token bucket per API family (`admin`, `data`,
+   `realtime`, `alpha`, `psi`, `indexing`; defaults 2/8/4/2/1/0.1 req/sec,
+   `RATE_LIMIT_*_RPS`). Calls over it wait, never drop.
+
+Retries: token exhaustion is never retried; concurrency exhaustion,
+UNAVAILABLE and HTTP 500/503 retry once. Results larger than
+`MCP_MAX_RESULT_BYTES` (12000) drop rows from the end and set `truncated`.
 
 ## Caching
 

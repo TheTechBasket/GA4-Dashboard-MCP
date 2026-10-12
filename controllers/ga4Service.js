@@ -10,6 +10,8 @@ const { AnalyticsAdminServiceClient } = require("@google-analytics/admin");
 
 const demo = require("./demoData");
 const { getCredentials, clientOptions } = require("../lib/credentials");
+const quotaLedger = require("../lib/quotaLedger");
+const { addSpent } = require("../lib/quotaConsole");
 
 /** True when the app can talk to GA4: demo mode, or GA4_CLIENT_EMAIL + GA4_PRIVATE_KEY in env. */
 const isConfigured = () => demo.enabled() || !!getCredentials();
@@ -18,12 +20,57 @@ let dataClientInstance = null;
 let adminClientInstance = null;
 let latestQuotaSnapshot = null;
 
+// GA4 Data methods and the quota pool each one spends from.
+const QUOTA_POOLS = {
+  runReport: "core",
+  runPivotReport: "core",
+  batchRunReports: "core",
+  batchRunPivotReports: "core",
+  runRealtimeReport: "realtime",
+  runFunnelReport: "funnel",
+};
+
+/** Write one response's propertyQuota to the shared ledger (read by the MCP server) and count its cost. */
+function noteQuota(property, pool, propertyQuota) {
+  if (!propertyQuota) return;
+  const id = String(property || "").split("/").pop();
+  if (!id) return;
+  quotaLedger.record(id, pool, propertyQuota, "dashboard");
+  addSpent(pool, propertyQuota.tokensPerHour?.consumed);
+}
+
+/**
+ * Wrap the real Data client so every report call asks for propertyQuota and records it.
+ * Demo mode never gets here: its fake client makes no GA4 calls and writes nothing.
+ */
+function withQuotaLedger(client) {
+  return new Proxy(client, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      const pool = QUOTA_POOLS[prop];
+      if (!pool || typeof value !== "function") return value;
+      return async (request = {}, ...rest) => {
+        const batch = Array.isArray(request.requests);
+        const req = batch
+          ? { ...request, requests: request.requests.map((r) => ({ ...r, returnPropertyQuota: true })) }
+          : { ...request, returnPropertyQuota: true };
+        const out = await value.call(target, req, ...rest);
+        const res = out?.[0];
+        const quota = res?.propertyQuota || res?.reports?.find((r) => r?.propertyQuota)?.propertyQuota
+          || res?.pivotReports?.find((r) => r?.propertyQuota)?.propertyQuota;
+        noteQuota(request.property, pool, quota);
+        return out;
+      };
+    },
+  });
+}
+
 /**
  * Get or initialize cached BetaAnalyticsDataClient
  */
 function getGA4DataClient() {
   if (!dataClientInstance) {
-    dataClientInstance = demo.enabled() ? demo.dataClient() : new BetaAnalyticsDataClient(clientOptions());
+    dataClientInstance = demo.enabled() ? demo.dataClient() : withQuotaLedger(new BetaAnalyticsDataClient(clientOptions()));
   }
   return dataClientInstance;
 }
@@ -225,4 +272,5 @@ module.exports = {
   runSafeHistoricalReport,
   isConfigured,
   resetClients,
+  withQuotaLedger,
 };

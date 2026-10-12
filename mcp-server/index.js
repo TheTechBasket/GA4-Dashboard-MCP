@@ -9,24 +9,114 @@ const { getAdminClient, getDataClient, getAlphaDataClient } = require("./lib/cli
 const { getScopedAuthClient } = require("./lib/auth");
 const cache = require("./lib/cache");
 const rateLimit = require("./lib/rateLimit");
+const guard = require("./lib/guard");
+const ledger = require("../lib/quotaLedger");
 
-const server = new McpServer({ name: "ga4-mcp-server", version: "0.1.0" });
+const INSTRUCTIONS = `GA4 quota is shared and small. Spend it carefully.
+
+Limits per property, per pool (core, realtime and funnel are separate pools):
+- 200,000 tokens per day, reset at midnight Pacific.
+- 40,000 tokens per hour (rolling), and 14,000 per hour for the whole GCP project. The GA4 dashboard uses the same project budget.
+- 10 concurrent requests, 10 server errors (500/503) per project per hour, 120 potentially thresholded requests per hour.
+- Cost grows with rows, dimensions, metrics, filters, date range length and high-cardinality dimensions. GA4 360 properties get 10x.
+
+Rules:
+- Work on one property per question. Call get_account_summaries once to find the ID. Never loop a report over many properties; ask the user which property instead. The server refuses after ${guard.MAX_PROPERTIES} distinct properties in ${guard.WINDOW_MS / 60000} minutes.
+- Ask for the smallest report that answers: orderBys plus a small limit, a dimensionFilter instead of pulling rows to filter, the shortest date range, few dimensions. High-cardinality dimensions (pagePath, pageLocation, pageTitle, landingPage*, customEvent:*, customUser:*) need orderBys and limit at most 50.
+- Every GA4 result has quota: {cost, projectHourLeft, hourLeft, dayLeft, status}. On status low, finish with what you have and tell the user. On a quota_low error, do not retry; report the reset time from the error.
+- Results are cached (report 1h, realtime 60s, metadata 6h). Repeating the same call is free.
+- Use get_rate_limit_status to see quota per property without spending tokens.`;
+
+const server = new McpServer({ name: "ga4-mcp-server", version: "0.2.0" }, { instructions: INSTRUCTIONS });
 
 const propertyName = (propertyId) => `properties/${propertyId}`;
 
-/** Cache-then-rate-limit-then-call wrapper shared by every GA4 tool. */
-async function cachedCall({ toolName, params, tier, family, fn }) {
+/**
+ * Cache, then guards, then rate limit, then the call. Shared by every GA4 tool.
+ * - propertyId: property-scoped tools; adds the distinct-properties check and the per-property concurrency cap.
+ * - pool: set on tools whose responses carry propertyQuota; adds the shared quota gate and ledger record.
+ *   fn then returns { value, propertyQuota }.
+ * - validate: optional function returning a guard error or null, run on a cache miss only.
+ * Guard errors come back as the result (not thrown) and are never cached.
+ */
+async function cachedCall({ toolName, params, tier, family, fn, propertyId, pool, validate }) {
 	const hit = cache.get(toolName, params, tier);
 	if (hit) {
-		return { ...hit.value, _cache: { hit: true, ageSeconds: hit.ageSeconds, ttlSeconds: hit.ttlSeconds } };
+		const out = { ...hit.value, _cache: { hit: true, ageSeconds: hit.ageSeconds, ttlSeconds: hit.ttlSeconds } };
+		if (pool) out.quota = ledger.status(propertyId, pool);
+		return out;
 	}
-	const value = await rateLimit.withRateLimit(family, fn);
+	const refused =
+		(validate && validate()) ||
+		(propertyId != null && guard.checkPropertySpread(propertyId)) ||
+		(pool && guard.checkQuota(propertyId, pool));
+	if (refused) return refused;
+
+	const call = () => rateLimit.withRateLimit(family, fn);
+	let result;
+	try {
+		result = propertyId != null ? await guard.inflight(propertyId, call) : await call();
+	} catch (err) {
+		const exhausted = pool && guard.exhaustedError(propertyId, pool, err);
+		if (exhausted) return exhausted;
+		throw err;
+	}
+	const _cache = { hit: false, ageSeconds: 0, ttlSeconds: cache.TTL_SECONDS[tier] };
+	if (!pool) {
+		cache.set(toolName, params, tier, result);
+		return { ...result, _cache };
+	}
+	const { value, propertyQuota } = result;
+	ledger.record(propertyId, pool, propertyQuota, "mcp");
 	cache.set(toolName, params, tier, value);
-	return { ...value, _cache: { hit: false, ageSeconds: 0, ttlSeconds: cache.TTL_SECONDS[tier] } };
+	const quota = propertyQuota ? ledger.summarize({ at: Date.now(), quota: propertyQuota }) : { status: "unknown" };
+	return { ...value, quota, _cache };
 }
 
+/** Compact JSON, cut to MCP_MAX_RESULT_BYTES by dropping rows from the end. */
 function asText(value) {
-	return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
+	return { content: [{ type: "text", text: guard.fitResult(value) }] };
+}
+
+const FUNNEL_MAX_ROWS = 100;
+const MONEY_METRIC = /revenue|purchase|value|ltv/i;
+
+/** Adds the property currency to a report result when any metric is money. Skips guard errors. */
+async function withCurrency(result, propertyId, metrics) {
+	if (result.error || !metrics.some((m) => MONEY_METRIC.test(m))) return result;
+	const details = await getPropertyDetailsCached(propertyId);
+	return details.currencyCode ? { ...result, currencyCode: details.currencyCode } : result;
+}
+
+/** GA4 rows to compact { headers, rows } arrays. */
+function compactRows(response, dimensions, metrics) {
+	return {
+		headers: [...dimensions, ...metrics],
+		rows: (response.rows || []).map((row) => [
+			...(row.dimensionValues || []).map((d) => d.value),
+			...(row.metricValues || []).map((m) => m.value),
+		]),
+	};
+}
+
+const MATCH_TYPES = ["EXACT", "BEGINS_WITH", "ENDS_WITH", "CONTAINS", "FULL_REGEXP"];
+const dimensionFilterSchema = z.object({
+	dimension: z.string().describe("Dimension to filter on, e.g. \"pagePath\""),
+	matchType: z.enum(MATCH_TYPES).default("EXACT"),
+	value: z.string(),
+	caseSensitive: z.boolean().optional(),
+});
+
+/** One or more simple dimension filters to a GA4 FilterExpression (ANDed). */
+function toFilterExpression(filters) {
+	const exprs = filters.map((f) => ({
+		filter: {
+			fieldName: f.dimension,
+			stringFilter: { matchType: f.matchType, value: f.value, caseSensitive: Boolean(f.caseSensitive) },
+		},
+	}));
+	if (!exprs.length) return undefined;
+	return exprs.length === 1 ? exprs[0] : { andGroup: { expressions: exprs } };
 }
 
 // ---------------------------------------------------------------------------
@@ -35,7 +125,10 @@ function asText(value) {
 
 server.registerTool(
 	"get_account_summaries",
-	{ description: "Lists every GA4 account and the properties under each one, for the credentials in use." },
+	{
+		description:
+			"Lists every GA4 account and its properties for the credentials in use. Admin API, no GA4 tokens. Call it once per session to find a property ID, then work on that one property.",
+	},
 	async () => {
 		const result = await cachedCall({
 			toolName: "get_account_summaries",
@@ -68,6 +161,7 @@ async function getPropertyDetailsCached(propertyId) {
 		params: { propertyId },
 		tier: "metadata",
 		family: "admin",
+		propertyId,
 		fn: async () => {
 			const [property] = await getAdminClient().getProperty({ name: propertyName(propertyId) });
 			return {
@@ -87,7 +181,8 @@ async function getPropertyDetailsCached(propertyId) {
 server.registerTool(
 	"get_property_details",
 	{
-		description: "Returns details (display name, time zone, currency, industry, create time) for one GA4 property.",
+		description:
+			"Returns details (display name, time zone, currency, industry, create time) for one GA4 property. Admin API, no GA4 tokens; cached 6h.",
 		inputSchema: { propertyId: z.string().describe("Numeric GA4 property ID, e.g. 257579250") },
 	},
 	async ({ propertyId }) => asText(await getPropertyDetailsCached(propertyId)),
@@ -96,7 +191,7 @@ server.registerTool(
 server.registerTool(
 	"list_google_ads_links",
 	{
-		description: "Lists the Google Ads accounts linked to a GA4 property.",
+		description: "Lists the Google Ads accounts linked to a GA4 property. Admin API, no GA4 tokens; cached 6h.",
 		inputSchema: { propertyId: z.string().describe("Numeric GA4 property ID") },
 	},
 	async ({ propertyId }) => {
@@ -105,6 +200,7 @@ server.registerTool(
 			params: { propertyId },
 			tier: "metadata",
 			family: "admin",
+			propertyId,
 			fn: async () => {
 				const [links] = await getAdminClient().listGoogleAdsLinks({ parent: propertyName(propertyId) });
 				return {
@@ -129,14 +225,16 @@ server.registerTool(
 	"run_report",
 	{
 		description:
-			"Runs a GA4 core report: dimensions x metrics over a date range. Mirrors the Data API runReport request shape.",
+			"Runs a GA4 core report: dimensions x metrics over a date range. Pool: core. " +
+			"Cost grows with rows, dimensions, date range and cardinality, so use orderBys, a small limit and a dimensionFilter.",
 		inputSchema: {
 			propertyId: z.string().describe("Numeric GA4 property ID"),
-			startDate: z.string().describe("e.g. 7daysAgo, 28daysAgo, today, or YYYY-MM-DD"),
+			startDate: z.string().describe("e.g. 7daysAgo, 28daysAgo, today, or YYYY-MM-DD. Range max 93 days."),
 			endDate: z.string().describe("e.g. today, yesterday, or YYYY-MM-DD"),
-			dimensions: z.array(z.string()).describe("e.g. [\"country\", \"sessionSource\"]"),
-			metrics: z.array(z.string()).describe("e.g. [\"sessions\", \"activeUsers\"]"),
-			limit: z.number().int().positive().max(1000).default(10),
+			dimensions: z.array(z.string()).describe("Max 4, e.g. [\"country\", \"sessionSource\"]"),
+			metrics: z.array(z.string()).describe("Max 6, e.g. [\"sessions\", \"activeUsers\"]"),
+			limit: z.number().int().positive().max(250).default(10).describe("Rows to return. Max 50 with a high-cardinality dimension."),
+			offset: z.number().int().min(0).default(0).describe("Row offset for paging"),
 			orderBys: z
 				.array(
 					z.object({
@@ -146,16 +244,22 @@ server.registerTool(
 					}),
 				)
 				.optional()
-				.describe("Sort rows server-side instead of pulling everything and sorting client-side, e.g. top pages by revenue"),
+				.describe("Sort rows server-side, e.g. top pages by revenue. Required with pagePath, pageTitle, landingPage and custom dimensions."),
+			dimensionFilter: dimensionFilterSchema.optional().describe("Filter rows server-side instead of pulling them and filtering"),
+			dimensionFilters: z.array(dimensionFilterSchema).optional().describe("Several filters, ANDed"),
 		},
 	},
-	async ({ propertyId, startDate, endDate, dimensions, metrics, limit, orderBys }) => {
-		const params = { propertyId, startDate, endDate, dimensions, metrics, limit, orderBys };
+	async ({ propertyId, startDate, endDate, dimensions, metrics, limit, offset, orderBys, dimensionFilter, dimensionFilters }) => {
+		const filters = [...(dimensionFilter ? [dimensionFilter] : []), ...(dimensionFilters || [])];
+		const params = { propertyId, startDate, endDate, dimensions, metrics, limit, offset, orderBys, filters };
 		const result = await cachedCall({
 			toolName: "run_report",
 			params,
 			tier: "report",
 			family: "data",
+			propertyId,
+			pool: "core",
+			validate: () => guard.validateReport({ dimensions, metrics, limit, startDate, endDate, orderBys }),
 			fn: async () => {
 				const [response] = await getDataClient().runReport({
 					property: propertyName(propertyId),
@@ -163,25 +267,23 @@ server.registerTool(
 					dimensions: dimensions.map((name) => ({ name })),
 					metrics: metrics.map((name) => ({ name })),
 					limit,
+					offset,
 					orderBys: (orderBys || []).map((o) => ({
 						...(o.metric ? { metric: { metricName: o.metric } } : { dimension: { dimensionName: o.dimension } }),
 						desc: o.desc,
 					})),
+					dimensionFilter: toFilterExpression(filters),
 					returnPropertyQuota: true,
 				});
-				const { currencyCode } = await getPropertyDetailsCached(propertyId);
+				const { headers, rows } = compactRows(response, dimensions, metrics);
+				const rowCount = response.rowCount ?? rows.length;
 				return {
-					rows: (response.rows || []).map((row) => ({
-						dimensions: row.dimensionValues.map((d) => d.value),
-						metrics: row.metricValues.map((m) => m.value),
-					})),
-					rowCount: response.rowCount,
-					currencyCode,
-					quota: response.propertyQuota || null,
+					value: { headers, rows, rowCount, returned: rows.length, truncated: rowCount > offset + rows.length },
+					propertyQuota: response.propertyQuota,
 				};
 			},
 		});
-		return asText(result);
+		return asText(await withCurrency(result, propertyId, metrics));
 	},
 );
 
@@ -189,7 +291,8 @@ server.registerTool(
 	"run_funnel_report",
 	{
 		description:
-			"Runs a GA4 funnel report: how many users completed each step of an ordered event sequence, over a date range.",
+			"Runs a GA4 funnel report: how many users completed each step of an ordered event sequence. Pool: funnel. " +
+			"Use few steps and the shortest date range; rows are capped at 100.",
 		inputSchema: {
 			propertyId: z.string().describe("Numeric GA4 property ID"),
 			startDate: z.string().describe("e.g. 7daysAgo or YYYY-MM-DD"),
@@ -207,6 +310,8 @@ server.registerTool(
 			params,
 			tier: "report",
 			family: "alpha",
+			propertyId,
+			pool: "funnel",
 			fn: async () => {
 				const [response] = await getAlphaDataClient().runFunnelReport({
 					property: propertyName(propertyId),
@@ -222,14 +327,16 @@ server.registerTool(
 							},
 						})),
 					},
+					returnPropertyQuota: true,
 				});
-				const headers = response.funnelTable.dimensionHeaders.map((h) => h.name);
+				const table = response.funnelTable || {};
+				const dims = (table.dimensionHeaders || []).map((h) => h.name);
+				const mets = (table.metricHeaders || []).map((h) => h.name);
+				const { headers, rows } = compactRows(table, dims, mets);
+				const capped = rows.slice(0, FUNNEL_MAX_ROWS);
 				return {
-					dimensionHeaders: headers,
-					rows: response.funnelTable.rows.map((row) => ({
-						dimensions: row.dimensionValues.map((d) => d.value),
-						metrics: row.metricValues.map((m) => m.value),
-					})),
+					value: { headers, rows: capped, rowCount: rows.length, returned: capped.length, truncated: rows.length > capped.length },
+					propertyQuota: response.propertyQuota,
 				};
 			},
 		});
@@ -240,7 +347,8 @@ server.registerTool(
 server.registerTool(
 	"get_custom_dimensions_and_metrics",
 	{
-		description: "Lists the custom dimensions and custom metrics defined on a GA4 property.",
+		description:
+			"Lists the custom dimensions and custom metrics defined on a GA4 property. Pool: core (getMetadata spends a few core tokens, no quota is returned). Cached 6h, so call it once.",
 		inputSchema: { propertyId: z.string().describe("Numeric GA4 property ID") },
 	},
 	async ({ propertyId }) => {
@@ -249,6 +357,7 @@ server.registerTool(
 			params: { propertyId },
 			tier: "metadata",
 			family: "data",
+			propertyId,
 			fn: async () => {
 				const [meta] = await getDataClient().getMetadata({ name: `${propertyName(propertyId)}/metadata` });
 				const pluck = (d) => ({ apiName: d.apiName, uiName: d.uiName, description: d.description });
@@ -269,13 +378,15 @@ server.registerTool(
 server.registerTool(
 	"run_realtime_report",
 	{
-		description: "Runs a GA4 realtime report covering the last N minutes (max 30, per the Data API).",
+		description:
+			"Runs a GA4 realtime report covering the last N minutes (max 30). Pool: realtime. " +
+			"Keep dimensions few and the limit small; results are cached 60s.",
 		inputSchema: {
 			propertyId: z.string().describe("Numeric GA4 property ID"),
 			dimensions: z.array(z.string()).default(["country"]),
 			metrics: z.array(z.string()).default(["activeUsers"]),
 			minutesAgo: z.number().int().min(1).max(30).default(29),
-			limit: z.number().int().positive().max(1000).default(10),
+			limit: z.number().int().positive().max(250).default(10),
 		},
 	},
 	async ({ propertyId, dimensions, metrics, minutesAgo, limit }) => {
@@ -285,6 +396,8 @@ server.registerTool(
 			params,
 			tier: "realtime",
 			family: "realtime",
+			propertyId,
+			pool: "realtime",
 			fn: async () => {
 				const [response] = await getDataClient().runRealtimeReport({
 					property: propertyName(propertyId),
@@ -294,23 +407,20 @@ server.registerTool(
 					limit,
 					returnPropertyQuota: true,
 				});
-				const { currencyCode } = await getPropertyDetailsCached(propertyId);
+				const { headers, rows } = compactRows(response, dimensions, metrics);
+				const rowCount = response.rowCount ?? rows.length;
 				return {
-					rows: (response.rows || []).map((row) => ({
-						dimensions: row.dimensionValues.map((d) => d.value),
-						metrics: row.metricValues.map((m) => m.value),
-					})),
-					currencyCode,
-					quota: response.propertyQuota || null,
+					value: { headers, rows, rowCount, returned: rows.length, truncated: rowCount > rows.length },
+					propertyQuota: response.propertyQuota,
 				};
 			},
 		});
-		return asText(result);
+		return asText(await withCurrency(result, propertyId, metrics));
 	},
 );
 
 // ---------------------------------------------------------------------------
-// PageSpeed Insights — real-world page speed, e.g. spot-check after a deploy
+// PageSpeed Insights: real-world page speed, e.g. spot-check after a deploy
 // ---------------------------------------------------------------------------
 
 server.registerTool(
@@ -370,7 +480,7 @@ server.registerTool(
 );
 
 // ---------------------------------------------------------------------------
-// Web Search Indexing API — request a (re)crawl right after deploying changes
+// Web Search Indexing API: request a (re)crawl right after deploying changes
 // ---------------------------------------------------------------------------
 
 server.registerTool(
@@ -378,7 +488,7 @@ server.registerTool(
 	{
 		description:
 			"Notifies Google's Indexing API that a URL changed, so it can be recrawled sooner. " +
-			"Requires the GA service account to be added as an Owner of the URL's property in Search Console — " +
+			"Requires the GA service account to be added as an Owner of the URL's property in Search Console, " +
 			"otherwise this returns a 403 ownership error. Not cached (it's an action, not a query).",
 		inputSchema: {
 			url: z.string().url(),
@@ -403,7 +513,7 @@ server.registerTool(
 );
 
 // ---------------------------------------------------------------------------
-// Inspection utilities — no GA4 API calls
+// Inspection utilities, no GA4 API calls
 // ---------------------------------------------------------------------------
 
 server.registerTool(
@@ -414,8 +524,19 @@ server.registerTool(
 
 server.registerTool(
 	"get_rate_limit_status",
-	{ description: "Shows the current local throttle state (requests/sec limit and tokens available) per GA4 API family." },
-	async () => asText(rateLimit.status()),
+	{
+		description:
+			"Shows GA4 quota left per property and pool (from the shared ledger the dashboard also writes), the reserve thresholds, " +
+			"Google's limits and the local throttle state. Costs no GA4 tokens.",
+	},
+	async () =>
+		asText({
+			local: rateLimit.status(),
+			ga4: ledger.list(),
+			nextDailyReset: guard.dailyResetIso(),
+			reserve: ledger.RESERVE,
+			limits: ledger.STANDARD,
+		}),
 );
 
 // ---------------------------------------------------------------------------

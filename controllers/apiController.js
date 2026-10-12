@@ -38,6 +38,17 @@ const propertyCurrencyMemCache = new Map();
 const REALTIME_MEM_TTL = 2 * 60 * 1000; // 2 minutes
 let realtimeMemCache = null;   // { data, quota, fetchDurationMs, cachedAt }
 let realtimeMemCachedAt = 0;
+/** Disk copy of the realtime cache, so a quick restart reuses it instead of a new 43-property batch. */
+const REALTIME_DISK_PATH = path.join(CACHE_DIR, "realtime_all.json");
+const REALTIME_RESTART_REUSE_MS = 60 * 1000;
+
+function setRealtimeMem(entry) {
+    realtimeMemCache = entry;
+    realtimeMemCachedAt = Date.now();
+    fs.mkdir(CACHE_DIR, { recursive: true })
+        .then(() => fs.writeFile(REALTIME_DISK_PATH, JSON.stringify({ at: realtimeMemCachedAt, entry })))
+        .catch(() => {}); // advisory: a failed write only costs one batch on the next restart
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,7 +120,6 @@ async function getAnalyticsProperties() {
         try {
             [properties] = await analyticsAdmin.listProperties({
                 filter: `parent:${account.name}`,
-                pageSize: 200,
             });
         } catch (err) {
             console.warn(
@@ -132,9 +142,6 @@ async function getAnalyticsProperties() {
     }
 
     // Fetch web data streams in parallel to get domain URLs
-    console.log(
-        `[admin] Fetching data streams for ${allProperties.length} properties…`,
-    );
     const enriched = await Promise.all(
         allProperties.map(async (prop) => {
             try {
@@ -196,12 +203,37 @@ async function getPropertyCurrencyCode(propertyId) {
 // ---------------------------------------------------------------------------
 
 exports.refreshPropertiesCache = async function refreshPropertiesCache() {
-    console.log("[cache] Refreshing properties cache…");
     const properties = await getAnalyticsProperties();
     await savePropertiesToCache(properties);
-    console.log(`[cache] Saved ${properties.length} properties.`);
     return properties;
 };
+
+let propertiesInFlight = null;
+
+/**
+ * Properties list for any page or API: the cache file, fetched from GA4 Admin when missing.
+ * refreshStale also refetches a cache older than CACHE_TTL_HOURS, force always refetches.
+ * A failed fetch falls back to the stale cache. One fetch at a time, shared by concurrent callers.
+ * Returns { properties, source: "cached" | "fetched" | "stale" | "none" }.
+ */
+exports.ensureProperties = async function ensureProperties({ refreshStale = false, force = false } = {}) {
+    const cache = await getCachedProperties();
+    const missing = !cache?.properties?.length;
+    if (!force && !missing && !(refreshStale && isCacheStale(cache))) {
+        return { properties: cache.properties, source: "cached" };
+    }
+    if (!propertiesInFlight) {
+        propertiesInFlight = exports.refreshPropertiesCache().finally(() => { propertiesInFlight = null; });
+    }
+    try {
+        return { properties: await propertiesInFlight, source: "fetched" };
+    } catch (err) {
+        console.error("[cache] Properties refresh failed" + (missing ? "" : ", using stale cache") + ":", err.message);
+        return { properties: cache?.properties ?? [], source: missing ? "none" : "stale" };
+    }
+};
+
+const loadProperties = async () => (await exports.ensureProperties()).properties;
 
 // ---------------------------------------------------------------------------
 // GA4 Data API – batch realtime report
@@ -332,21 +364,8 @@ async function addLiveDetail(row) {
 
 exports.allrealtime = async (req, res) => {
     try {
-        let cache = await getCachedProperties();
-
-        if (isCacheStale(cache)) {
-            try {
-                const properties = await exports.refreshPropertiesCache();
-                cache = { properties, lastUpdated: new Date().toISOString() };
-            } catch (err) {
-                console.error(
-                    "[cache] Refresh failed, using stale cache:",
-                    err.message,
-                );
-            }
-        }
-
-        const properties = cache?.properties ?? [];
+        const { properties } = await exports.ensureProperties({ refreshStale: true });
+        const cache = await getCachedProperties();
 
         // ---- in-memory short-term cache: skip GA4 API if fresh enough ----
         const memAge = Date.now() - realtimeMemCachedAt;
@@ -354,24 +373,20 @@ exports.allrealtime = async (req, res) => {
 
         if (realtimeMemCache && memAge < REALTIME_MEM_TTL) {
             ({ data: batchData, quota, fetchDurationMs } = realtimeMemCache);
-            console.log(`[mem-cache] Serving realtime from memory (age ${Math.round(memAge/1000)}s)`);
         } else if (realtimeMemCache) {
             // Memory cache exists but stale - serve memory cache instantly, refresh in background
             ({ data: batchData, quota, fetchDurationMs } = realtimeMemCache);
-            console.log(`[mem-cache] Serving stale memory cache, refreshing in background…`);
             (async () => {
                 try {
                     const fetchStart = Date.now();
                     const { data, quota: q } = await batchRealtimeReport({ properties });
-                    realtimeMemCache = { data, quota: q, fetchDurationMs: Date.now() - fetchStart };
-                    realtimeMemCachedAt = Date.now();
+                    setRealtimeMem({ data, quota: q, fetchDurationMs: Date.now() - fetchStart });
                 } catch (e) {
                     console.warn('[mem-cache] Background refresh failed:', e.message);
                 }
             })();
         } else {
             // Cold start - render instantly with cached properties structure, fetch live data in background
-            console.log('[mem-cache] Cold start: rendering instant layout, fetching live data in background…');
             batchData = properties.map((p) => ({
                 propertyId: p.id,
                 siteName: p.site,
@@ -389,9 +404,7 @@ exports.allrealtime = async (req, res) => {
                 try {
                     const fetchStart = Date.now();
                     const { data, quota: q } = await batchRealtimeReport({ properties });
-                    realtimeMemCache = { data, quota: q, fetchDurationMs: Date.now() - fetchStart };
-                    realtimeMemCachedAt = Date.now();
-                    console.log(`[mem-cache] Cold start background fetch complete (${data.length} properties)`);
+                    setRealtimeMem({ data, quota: q, fetchDurationMs: Date.now() - fetchStart });
                 } catch (e) {
                     console.warn('[mem-cache] Cold start background fetch failed:', e.message);
                 }
@@ -444,11 +457,30 @@ exports.allrealtime = async (req, res) => {
     }
 };
 
+/**
+ * Boot: one realtime batch for every property into the in-memory cache that "/", /api/realtime-all
+ * and the analytics live strip read. Returns { sites, activeUsers }, or "cached" when it is fresh.
+ */
+exports.warmRealtime = async function warmRealtime() {
+    if (realtimeMemCache && Date.now() - realtimeMemCachedAt < REALTIME_MEM_TTL) return "cached";
+    const disk = await fs.readFile(REALTIME_DISK_PATH, "utf8").then(JSON.parse).catch(() => null);
+    if (disk?.entry && Date.now() - disk.at < REALTIME_RESTART_REUSE_MS) {
+        realtimeMemCache = disk.entry;
+        realtimeMemCachedAt = disk.at;
+        return "cached";
+    }
+    const properties = await loadProperties();
+    const fetchStart = Date.now();
+    const { data, quota } = await batchRealtimeReport({ properties });
+    setRealtimeMem({ data, quota, fetchDurationMs: Date.now() - fetchStart });
+    const ok = data.filter((r) => !r.error);
+    return { sites: ok.length, activeUsers: ok.reduce((s, r) => s + (r.activeUsers || 0), 0) };
+};
+
 /** GET /api/realtime-all – returns live realtime stats for all properties (async hydration endpoint) */
 exports.realtimeAllApi = async (req, res) => {
     try {
-        const cache = await getCachedProperties();
-        const properties = cache?.properties ?? [];
+        const properties = await loadProperties();
         const memAge = Date.now() - realtimeMemCachedAt;
 
         if (realtimeMemCache && memAge < REALTIME_MEM_TTL) {
@@ -459,8 +491,7 @@ exports.realtimeAllApi = async (req, res) => {
         const { data, quota } = await batchRealtimeReport({ properties });
         const fetchDurationMs = Date.now() - fetchStart;
 
-        realtimeMemCache = { data, quota, fetchDurationMs };
-        realtimeMemCachedAt = Date.now();
+        setRealtimeMem({ data, quota, fetchDurationMs });
 
         res.json({ ok: true, cached: false, data, quota, fetchDurationMs });
     } catch (err) {
@@ -514,7 +545,7 @@ exports.quotaData = (req, res) => {
 
 /** GET /api/nav-index: sites and report names for the navbar jump palette */
 exports.navIndex = async (req, res) => {
-    const props = (await getCachedProperties())?.properties ?? [];
+    const props = await loadProperties();
     res.json({
         ok: true,
         sites: props.map((p) => ({ id: String(p.id), name: p.site || p.domain || String(p.id), domain: p.domain || "" })),
@@ -534,8 +565,7 @@ exports.trafficSpikes = async (req, res) => {
             return res.json({ ...cached, cached: true });
         }
 
-        const cache = await getCachedProperties();
-        const properties = cache?.properties ?? [];
+        const properties = await loadProperties();
 
         const spikes = await detectAllSpikes(properties, opts);
         const payload = { ok: true, count: spikes.length, rule: opts, spikes };
@@ -787,7 +817,8 @@ async function fetchGlobeUsersData(properties) {
         for (const r of [users, events]) {
             if (r.quota) {
                 globeQuotas.set(prop.id, r.quota);
-                // The installed @google-analytics/data client omits tokensPerProjectPerHour: fall back to tokensPerHour.
+                // @google-analytics/data 6.1.0 v1beta does return tokensPerProjectPerHour. tokensPerHour stays as the
+                // fallback because GA4 can leave a QuotaStatus out of a response, and a missing one reads as null here.
                 cost += Number((r.quota.tokensPerProjectPerHour || r.quota.tokensPerHour)?.consumed) || 0;
             }
         }
@@ -802,6 +833,31 @@ async function fetchGlobeUsersData(properties) {
         getCityCoords,
     );
 }
+
+/** Fetch city-level users for every property and write the cache file. One fetch at a time. */
+function loadGlobeUsers() {
+    if (!globeFetchInFlight) {
+        globeFetchInFlight = (async () => {
+            const properties = await loadProperties();
+            const payload = await fetchGlobeUsersData(properties);
+            payload.fetchedAt = new Date().toISOString();
+            payload.v = GLOBE_USERS_CACHE_V;
+            payload.refresh = refreshInfo(globeQuotas, globeCosts);
+            const publicPayload = stripSensitiveGlobeUsersPayload(payload);
+            // No properties yet (first boot, Admin API failed): do not cache an empty globe for the TTL.
+            if (properties.length) await saveGlobeUsersToCache(publicPayload);
+            return publicPayload;
+        })().finally(() => { globeFetchInFlight = null; });
+    }
+    return globeFetchInFlight;
+}
+
+/** Boot warm-up: "cached" when the globe cache is fresh, else fetch it and return the active user count. */
+exports.warmGlobeUsers = async function warmGlobeUsers() {
+    if (await getCachedGlobeUsers(60)) return "cached"; // a restart within a minute reuses the last poll
+    const payload = await loadGlobeUsers();
+    return payload.totalActiveUsers ?? 0;
+};
 
 /** GET /api/globe-users?maxAge=N – city-level users, event feed, quota-aware refresh (N seconds, 0..300) */
 exports.globeUsers = async (req, res) => {
@@ -819,20 +875,7 @@ exports.globeUsers = async (req, res) => {
         const cached = await getCachedGlobeUsers(maxAge);
         if (cached) return send(cached);
 
-        if (!globeFetchInFlight) {
-            globeFetchInFlight = (async () => {
-                const propCache  = await getCachedProperties();
-                const properties = propCache?.properties ?? [];
-                const payload = await fetchGlobeUsersData(properties);
-                payload.fetchedAt = new Date().toISOString();
-                payload.v = GLOBE_USERS_CACHE_V;
-                payload.refresh = refreshInfo(globeQuotas, globeCosts);
-                const publicPayload = stripSensitiveGlobeUsersPayload(payload);
-                await saveGlobeUsersToCache(publicPayload);
-                return publicPayload;
-            })().finally(() => { globeFetchInFlight = null; });
-        }
-        send(await globeFetchInFlight);
+        send(await loadGlobeUsers());
     } catch (err) {
         console.error("[globe-users] Fatal:", err.message);
         res.status(500).json({ error: err.message });
@@ -847,8 +890,7 @@ exports.globeData = async (req, res) => {
             return res.json(cached);
         }
 
-        const propCache  = await getCachedProperties();
-        const properties = propCache?.properties ?? [];
+        const properties = await loadProperties();
 
         const countries  = await fetchGlobeCountryData(properties);
         const payload    = { fetchedAt: new Date().toISOString(), countries };
@@ -880,8 +922,7 @@ exports.globeView = (req, res) => {
 /** GET /analytics – renders analytics dashboard view */
 exports.analyticsView = async (req, res) => {
     try {
-        const cache      = await getCachedProperties();
-        const properties = cache?.properties ?? [];
+        const properties = await loadProperties();
         res.render("analytics", {
             properties,
             analyticsCatalog: getAnalyticsCatalog(),

@@ -59,8 +59,9 @@ app.use(express.static('public'));
 // there will be no logging for static file as they are served before setting up logging
 
 
+app.use(log.problems);
+
 if (process.env.NODE_ENV === 'development') {
-	app.use(log.requests);
 	app.locals.baseurl = 'http://localhost:5483';
 }
 
@@ -100,6 +101,11 @@ app.set('view engine', 'hbs');
 const { isConfigured, resetClients } = require('./controllers/ga4Service');
 const setup = require('./lib/setupCheck');
 setup.onCredentialsChange(resetClients);
+// Boot runs after listen; when credentials arrive later through /setup, it runs once more.
+const { runBoot, bootGate } = require('./lib/boot');
+let bootState = null;
+let bootWarmPending = false;
+setup.onCredentialsChange(() => { if (bootState?.waiting && isConfigured()) startBoot(); });
 const SETUP_DOC = require('./lib/setupDoc').loadSetupDoc();
 const { version: APP_VERSION } = require('./package.json');
 const DOCKER_IMAGE = 'ghcr.io/thetechbasket/ga4-dashboard:latest';
@@ -155,6 +161,14 @@ app.use((req, res, next) => {
 	res.redirect('/setup');
 });
 
+// First boot: pages show a live progress page, API requests wait (max 30 s) until the warm step ends.
+app.get('/api/boot/status', (req, res) => {
+	res.json({ ready: !bootWarmPending, steps: bootState?.progress || [] });
+});
+app.use(bootGate(() => (bootWarmPending ? bootState.warm : null), {
+	page: (req, res) => res.set('Cache-Control', 'no-store').render('booting', { layout: false, steps: bootState?.progress || [] }),
+}));
+
 /* Routes */
 const apiroutes = require("./routes/apiRoutes.js");
 
@@ -185,7 +199,7 @@ app.listen(port, () => {
 		].filter(Boolean),
 	});
 
-	// Warm country metadata cache in background (restcountries.com → .cache/countries.json)
+	// Load the bundled country list into memory
 	const { warmCountriesCache } = require('./controllers/countriesCache');
 	warmCountriesCache();
 
@@ -204,16 +218,62 @@ app.listen(port, () => {
 		cacheCleanup().catch(() => {});
 	}, 6 * 60 * 60 * 1000);
 
-	// Trigger a properties cache refresh on startup when --refresh-cache is passed,
-	// e.g.: node app.js --refresh-cache
-	if (process.argv.includes('--refresh-cache') || app.locals.demo) {
-		const { refreshPropertiesCache } = require('./controllers/apiController');
-		refreshPropertiesCache()
-			.then((props) =>
-				console.log(`[startup] Cache refreshed: ${props.length} properties`),
-			)
-			.catch((err) =>
-				console.error('[startup] Cache refresh failed:', err.message),
-			);
-	}
+	startBoot();
 });
+
+// ── Boot sequence: one numbered line per step (lib/boot.js) ──
+// `node app.js --refresh-cache` (and demo mode) refetch the properties list instead of reading the cache.
+function startBoot() {
+	const api = require('./controllers/apiController');
+	const nf = (n) => Number(n).toLocaleString('en-US');
+	const state = { waiting: false };
+	const steps = [
+		{ name: 'config', run: () => {
+			if (app.locals.demo) return 'demo mode, generated data';
+			if (!isConfigured()) { state.waiting = true; return { msg: 'GA4 credentials missing, waiting for setup (open /setup)', stop: true }; }
+			return 'GA4 credentials from .env';
+		} },
+		{ name: 'properties', run: async () => {
+			const force = app.locals.demo || process.argv.includes('--refresh-cache');
+			const { properties, source } = await api.ensureProperties({ force });
+			return `${properties.length} properties, ${source}`;
+		} },
+		{ name: 'warm', run: async () => {
+			const globe = await api.warmGlobeUsers();
+			return globe === 'cached' ? 'globe users cached' : `globe users fetched, ${nf(globe)} active`;
+		} },
+		{ name: 'live', run: async () => {
+			const live = await api.warmRealtime();
+			return live === 'cached' ? 'live counts cached' : `${nf(live.activeUsers)} active users on ${live.sites} sites`;
+		} },
+		{ name: 'ready', run: () => `ready in ${((Date.now() - started) / 1000).toFixed(1)} s` },
+	];
+	const started = Date.now();
+	bootWarmPending = true;
+	const run = runBoot(steps, { gateAfter: 3 });
+	bootState = Object.assign(state, run);
+	run.warm.then(() => { bootWarmPending = false; });
+	run.done.then(() => { if (!state.waiting && !app.locals.demo) startQuotaLog(); });
+}
+
+// ── Quota line: shared ledger (lib/quotaLedger.js), after boot, then every 5 min when tokens were spent ──
+let quotaTimer = null;
+const quotaSeen = new Set();
+async function printQuota(always) {
+	const qc = require('./lib/quotaConsole');
+	const spent = qc.takeSpent();
+	if (!always && !Object.values(spent).some((v) => v > 0)) return;
+	const { properties } = await require('./controllers/apiController').ensureProperties();
+	const names = Object.fromEntries(properties.map((p) => [String(p.id), p.site || p.domain || String(p.id)]));
+	const entries = require('./lib/quotaLedger').list();
+	const lines = qc.quotaLines(entries, { names, spent });
+	if (!lines.length) console.log('[quota] no GA4 calls in the last hour');
+	lines.forEach((l) => console.log(`[quota] ${l}`));
+	qc.quotaWarnings(entries, quotaSeen, { names }).forEach((w) => console.warn(`[quota] ${w}`));
+}
+function startQuotaLog() {
+	printQuota(true).catch((err) => console.error('[quota] Line failed:', err.message));
+	if (quotaTimer) return;
+	quotaTimer = setInterval(() => printQuota(false).catch(() => {}), 5 * 60 * 1000);
+	quotaTimer.unref();
+}
