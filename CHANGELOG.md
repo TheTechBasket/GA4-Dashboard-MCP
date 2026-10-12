@@ -3,6 +3,26 @@
 All notable changes to this project are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-10-12
+
+### Added
+
+- MCP quota guardrails: server instructions for agents, a quota gate that reads `propertyQuota` from each response, a limit of 3 distinct properties in 10 minutes, report size caps, at most 3 requests in flight per property, and a 12 KB output cap. A GA4 RESOURCE_EXHAUSTED error returns `quota_exhausted` with the reset time.
+- Shared quota ledger (`.data/quota-ledger.json`): the dashboard and the MCP server both record what GA4 reports, so the MCP leaves about 30% of the project-hour budget for the dashboard. `get_rate_limit_status` reads it without spending tokens.
+- Boot progress page: while the server starts, any page shows the boot steps live and opens by itself when ready.
+- Console: numbered boot steps, a "still running..." line for slow steps, and one quota line per pool (after boot, then every 5 min when tokens were spent) instead of a line per request.
+
+### Changed
+
+- `/analytics` opens with 7 GA4 calls instead of 20. The other cards load when you scroll to them.
+- A restart within 60 s reuses the last globe and live counts, so it spends no GA4 tokens.
+- Country data comes only from the bundled list. restcountries.com v3.1 was deprecated and returned an error on every boot.
+
+### Fixed
+
+- First boot: opening a page other than `/` before the properties list was cached failed or showed an empty globe.
+- AutopaginateTrueWarning in the console when listing properties.
+
 ## [2.0.0] - 2026-10-10
 
 ### Added
