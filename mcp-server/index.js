@@ -51,12 +51,24 @@ async function cachedCall({ toolName, params, tier, family, fn, propertyId, pool
 		(propertyId != null && guard.checkPropertySpread(propertyId)) ||
 		(pool && guard.checkQuota(propertyId, pool));
 	if (refused) return refused;
+	const cooldown = pool && ledger.blocked(propertyId, pool);
+	if (cooldown) {
+		return {
+			error: "rate_limited",
+			gcpProject: cooldown.gcpProject,
+			scope: cooldown.scope,
+			retryAfter: new Date(cooldown.until).toISOString(),
+			reason: cooldown.reason,
+			hint: "GA4 is paused after a rate-limit or server error. Do not retry. Tell the user the project and the time above.",
+		};
+	}
 
 	const call = () => rateLimit.withRateLimit(family, fn);
 	let result;
 	try {
 		result = propertyId != null ? await guard.inflight(propertyId, call) : await call();
 	} catch (err) {
+		if (pool) ledger.block(propertyId, pool, err, "mcp");
 		const exhausted = pool && guard.exhaustedError(propertyId, pool, err);
 		if (exhausted) return exhausted;
 		throw err;
@@ -531,6 +543,8 @@ server.registerTool(
 	},
 	async () =>
 		asText({
+			gcpProject: ledger.gcpProject(),
+			rateLimited: ledger.cooldowns(),
 			local: rateLimit.status(),
 			ga4: ledger.list(),
 			nextDailyReset: guard.dailyResetIso(),

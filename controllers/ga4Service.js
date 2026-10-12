@@ -54,7 +54,17 @@ function withQuotaLedger(client) {
         const req = batch
           ? { ...request, requests: request.requests.map((r) => ({ ...r, returnPropertyQuota: true })) }
           : { ...request, returnPropertyQuota: true };
-        const out = await value.call(target, req, ...rest);
+        const id = String(request.property || "").split("/").pop();
+        const cooldown = quotaLedger.blocked(id, pool);
+        if (cooldown) throw quotaLedger.blockedError(cooldown);
+        let out;
+        try {
+          out = await value.call(target, req, ...rest);
+        } catch (err) {
+          const c = quotaLedger.block(id, pool, err, "dashboard");
+          if (c) console.warn(`[ga4Service] GA4 paused for GCP project ${c.gcpProject} until ${new Date(c.until).toISOString()}: ${c.reason}`);
+          throw err;
+        }
         const res = out?.[0];
         const quota = res?.propertyQuota || res?.reports?.find((r) => r?.propertyQuota)?.propertyQuota
           || res?.pivotReports?.find((r) => r?.propertyQuota)?.propertyQuota;

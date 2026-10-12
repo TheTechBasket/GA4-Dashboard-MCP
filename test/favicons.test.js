@@ -44,8 +44,8 @@ describe("favicons", () => {
     });
 
     it("builds a letter tile from the site name and series color by index", () => {
-        assert.deepStrictEqual(letterTile("www.menuxp.com", 0), { letter: "M", color: "#4f46e5" });
-        assert.deepStrictEqual(letterTile("quiz.quotedtale.com", 5), { letter: "Q", color: "#0891b2" });
+        assert.deepStrictEqual(letterTile("www.mysite.example", 0), { letter: "M", color: "#4f46e5" });
+        assert.deepStrictEqual(letterTile("quiz.example.com", 5), { letter: "Q", color: "#0891b2" });
         assert.strictEqual(letterTile("", 2).letter, "?");
     });
 });
