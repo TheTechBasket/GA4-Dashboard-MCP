@@ -520,7 +520,8 @@ exports.favicon = async (req, res) => {
         "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
         "X-Content-Type-Options": "nosniff",
     });
-    res.sendFile(file);
+    // Express 5 (send 1.x) refuses any dot folder in the path; the cache lives in .data/
+    res.sendFile(file, { dotfiles: "allow" });
 };
 
 /** GET /api/flag/:cc: country flag SVG (lowercase ISO code), cached forever in .data/flags */
