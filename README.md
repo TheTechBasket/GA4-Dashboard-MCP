@@ -33,6 +33,7 @@ Screenshots use demo mode (generated data, fictional sites).
 - **MCP Server**: Query GA4 properties, funnels, and reports from AI tools (Claude Code, Claude Desktop, Cursor). It lives in `mcp-server/` and shares the root `.env` and `pnpm install`.
 - **Privacy Shield**: Redacts full URL parameters and query strings to prevent private data leakage on dashboards.
 - **Smart Caching & Quota Protection**: Disk + in-memory caching layers with automatic background property metadata updates to preserve GA4 API quota.
+- **Sites page**: `/sites` reads the daily sessions snapshot (`pnpm snapshot:sessions`) and shows every property as Needs a look, a sortable table, or a 14-day heatmap.
 - **Setup page**: Until credentials work, every page opens `/setup`: a prompt for your AI agent and a live checklist that moves on as each step passes.
 
 ---
@@ -152,6 +153,19 @@ sudo tailscale serve --bg 5483
 It serves at `https://<machine>.<tailnet>.ts.net` (HTTPS certificates must be on for your tailnet) and stays on after reboot. `tailscale serve reset` turns it off. Do not use Funnel for this app: Funnel makes the URL public, and the app has no login.
 
 Docs: [install on Linux](https://tailscale.com/kb/1031/install-linux), [Tailscale Serve](https://tailscale.com/kb/1312/serve), [`tailscale serve` reference](https://tailscale.com/kb/1242/tailscale-serve).
+
+### Sites page snapshots
+
+`/sites` makes no GA4 calls. It reads `data/snapshots/latest.json`, written by `pnpm snapshot:sessions` (14 days of daily sessions per property; run it daily with cron or a systemd timer).
+
+Optional AdSense earnings: put a file at `data/snapshots/adsense-latest.json` and the page adds earnings columns and an earnings drop flag. Any tool can write it:
+
+```json
+{ "generatedAt": "2026-10-19T06:00:00Z", "currency": "USD",
+  "domains": { "www.example.com": { "daily": { "20261018": { "earnings": 12.34, "pageViews": 5678 } } } } }
+```
+
+A property matches a domain by its web stream URL host (exact first, then ignoring a leading `www.`). Without the file, nothing about earnings shows.
 
 ---
 

@@ -34,6 +34,9 @@ router.get('/api/property-detail/:propertyId', apiController.propertyDetail);
 /** Per-property aggregate visitor persona and intent insights */
 router.get('/api/visitor-insights/:propertyId', apiController.visitorInsights);
 
+/** Sites page: all properties from the daily snapshot (controllers/sitesController.js) */
+router.get('/sites', require('../controllers/sitesController').sitesView);
+
 /** Analytics page */
 router.get('/analytics', apiController.analyticsView);
 

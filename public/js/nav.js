@@ -83,6 +83,7 @@
     { name: 'Dashboard', href: '/', icon: 'nb-dash' },
     { name: 'Globe', href: '/globe', icon: 'nb-globe' },
     { name: 'Analytics', href: '/analytics', icon: 'nb-bars' },
+    { name: 'Sites', href: '/sites', icon: 'nb-sites' },
     { name: 'Setup', href: '/setup', icon: 'nb-setup' },
   ];
   let index = null, loading = null, shown = [], sel = 0;

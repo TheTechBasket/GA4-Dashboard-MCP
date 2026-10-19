@@ -113,10 +113,10 @@ const DOCKER_IMAGE = 'ghcr.io/thetechbasket/ga4-dashboard:latest';
 const STEP_SHOTS = { 0: ['s1-project', 'New Project form'], 1: ['s2-enable-api', 'Google Analytics Data API page with the Enable button'], 2: ['s3-service-account', 'Create service account form'], 3: ['s4-keys', 'Keys tab with the Add key menu open'], 6: ['s7-viewer', 'GA4 Add roles panel with Viewer selected'] };
 
 // Navbar: page title and active icon from the path (views/partials/navbar.hbs)
-const NAV_PAGES = { '/': 'Dashboard', '/globe': 'Globe', '/analytics': 'Analytics', '/setup': 'Setup' };
+const NAV_PAGES = { '/': 'Dashboard', '/globe': 'Globe', '/analytics': 'Analytics', '/sites': 'Sites', '/setup': 'Setup' };
 app.use((req, res, next) => {
 	const title = NAV_PAGES[req.path] || '';
-	res.locals.nav = { title, dash: title === 'Dashboard', globe: title === 'Globe', analytics: title === 'Analytics' };
+	res.locals.nav = { title, dash: title === 'Dashboard', globe: title === 'Globe', analytics: title === 'Analytics', sites: title === 'Sites' };
 	next();
 });
 
@@ -192,7 +192,7 @@ app.listen(port, () => {
 		version: APP_VERSION,
 		url: `http://localhost:${port}`,
 		mode: app.locals.demo ? { label: 'demo', style: 'yellow' } : dev ? { label: 'development', style: 'magenta' } : { label: 'production', style: 'green' },
-		links: [['Dashboard', '/'], ['Globe', '/globe'], ['Analytics', '/analytics'], ['Setup', '/setup'], ['Health', '/healthz']],
+		links: [['Dashboard', '/'], ['Globe', '/globe'], ['Analytics', '/analytics'], ['Sites', '/sites'], ['Setup', '/setup'], ['Health', '/healthz']],
 		notes: [
 			app.locals.demo && 'Demo mode: generated data, no GA4 calls',
 			!app.locals.demo && !isConfigured() && 'GA4 credentials missing: open /setup',
