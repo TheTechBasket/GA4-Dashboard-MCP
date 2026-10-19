@@ -45,9 +45,9 @@ describe("siteStatus", () => {
   });
 
   it("matches hosts exactly first, then without www.", () => {
-    const d = ["www.menuxp.com", "menuxp.com", "quiz.example.com", "www.other.com"];
-    expect(matchHost("www.menuxp.com", d)).to.equal("www.menuxp.com");
-    expect(matchHost("menuxp.com", d)).to.equal("menuxp.com");
+    const d = ["www.example.org", "example.org", "quiz.example.com", "www.other.com"];
+    expect(matchHost("www.example.org", d)).to.equal("www.example.org");
+    expect(matchHost("example.org", d)).to.equal("example.org");
     expect(matchHost("other.com", d)).to.equal("www.other.com");
     expect(matchHost("nope.com", d)).to.equal(null);
     expect(matchHost(null, d)).to.equal(null);

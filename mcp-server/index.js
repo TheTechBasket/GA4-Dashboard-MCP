@@ -195,7 +195,7 @@ server.registerTool(
 	{
 		description:
 			"Returns details (display name, time zone, currency, industry, create time) for one GA4 property. Admin API, no GA4 tokens; cached 6h.",
-		inputSchema: { propertyId: z.string().describe("Numeric GA4 property ID, e.g. 257579250") },
+		inputSchema: { propertyId: z.string().describe("Numeric GA4 property ID, e.g. 123456789") },
 	},
 	async ({ propertyId }) => asText(await getPropertyDetailsCached(propertyId)),
 );

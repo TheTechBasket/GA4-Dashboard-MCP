@@ -49,7 +49,7 @@ async function loadSitesSnapshot() {
         const key = matchHost(hostOf(prop?.url || prop?.domain || ""), keys);
         if (key) {
             matched++;
-            // AdSense can report a site under both www. and bare host (jigsawking): sum them.
+            // AdSense can report a site under both www. and bare host (example.com and www.example.com): sum them.
             const bare = key.replace(/^www\./, "");
             const ads = {};
             for (const k of keys.filter((d) => d.replace(/^www\./, "") === bare)) {

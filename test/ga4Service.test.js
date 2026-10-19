@@ -17,7 +17,7 @@ describe("ga4 service realtime fallback", () => {
     };
 
     const result = await runSafeRealtimeReport({
-      propertyId: "372460614",
+      propertyId: "123456789",
       dimensions: [{ name: "unifiedScreenName" }],
       metrics: [{ name: "screenPageViews" }],
       fallbackMetrics: [{ name: "activeUsers" }],
