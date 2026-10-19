@@ -49,7 +49,17 @@ async function loadSitesSnapshot() {
         const key = matchHost(hostOf(prop?.url || prop?.domain || ""), keys);
         if (key) {
             matched++;
-            out.ads = adDomains[key].daily || {};
+            // AdSense can report a site under both www. and bare host (jigsawking): sum them.
+            const bare = key.replace(/^www\./, "");
+            const ads = {};
+            for (const k of keys.filter((d) => d.replace(/^www\./, "") === bare)) {
+                for (const [day, v] of Object.entries(adDomains[k].daily || {})) {
+                    const a = (ads[day] ||= { earnings: 0, pageViews: 0 });
+                    a.earnings += Number(v.earnings) || 0;
+                    a.pageViews += Number(v.pageViews) || 0;
+                }
+            }
+            out.ads = ads;
             out.adsHost = key;
         }
         return out;
