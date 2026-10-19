@@ -11,7 +11,8 @@
     "demo": "DEMO=1 node app.js",
     "test": "mocha test/**/*.test.js",
     "mcp": "node mcp-server/index.js",
-    "setup:check": "node scripts/setup-check.js"
+    "setup:check": "node scripts/setup-check.js",
+    "snapshot:sessions": "node scripts/snapshot-sessions.js"
   },
   "repository": {
     "type": "git",

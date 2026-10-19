@@ -182,3 +182,6 @@ plans/
 # Internal specs and design tooling (never commit)
 tasks/
 .impeccable/
+
+# Daily GA4 sessions snapshots (pnpm snapshot:sessions), local only
+data/snapshots/
