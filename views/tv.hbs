@@ -93,7 +93,9 @@
   .ebtn { font: inherit; font-size: .85rem; color: var(--text-2); background: var(--surface-2); border: 0; border-radius: 2px; padding: .3rem .7rem; cursor: pointer; }
   .ebtn:hover { color: var(--text); background: var(--surface-3); }
   .ebtn.pri { background: var(--accent); color: #fff; }
-  body.idle:not(.editing) .bar-b .ebtn { visibility: hidden; }
+  /* controls show on mouse move, hide after 3 s idle; a low quota stays visible as a warning */
+  .bar-b .ebtn, .quota { transition: opacity .4s var(--ease-out), visibility .4s; }
+  body.idle:not(.editing) .bar-b .ebtn, body.idle:not(.editing) .quota:not(.low) { opacity: 0; visibility: hidden; }
 
   /* edit mode */
   .ebar { display: none; position: fixed; top: .8rem; left: 50%; translate: -50% 0; z-index: 20; gap: .5rem; align-items: center; padding: .5rem; background: var(--surface-2); border-radius: 3px; box-shadow: 0 8px 30px rgba(0,0,0,.4); font-size: .85rem; }
