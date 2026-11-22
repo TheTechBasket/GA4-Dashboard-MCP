@@ -157,6 +157,43 @@
     </section>
   </div>
 
+  {{#if sites.length}}
+  <section class="su-ai" id="sites" aria-labelledby="sitesH">
+    <div class="su-head">
+      <div>
+        <h1 id="sitesH">Sites shown</h1>
+        <p class="muted">Tick the GA4 properties the dashboard, globe and TV board show. Unticked sites are not fetched, so they cost no quota. New properties GA4 adds show with a New badge until you untick them.</p>
+      </div>
+    </div>
+    <form class="card" method="post" action="/api/site-selection">
+      <div class="card-h"><h2>Properties</h2><span class="faint small num">{{sitesOn}} of {{sites.length}} shown{{#if sitesNew}} · {{sitesNew}} new{{/if}}</span></div>
+      <div class="card-b flush">
+        <ul class="su-sites">
+          {{#each sites}}
+          <li><label><input type="checkbox" name="selected" value="{{id}}" {{#if selected}}checked{{/if}} />
+            <span class="tx"><span class="nm">{{site}}</span><span class="faint small">{{domain}}</span></span>{{#if isNew}}<span class="badge">New</span>{{/if}}</label></li>
+          {{/each}}
+        </ul>
+        <div class="su-row">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="button" class="btn" data-sites-all>Tick all</button>
+          {{#if sitesSaved}}<span class="faint small" role="status">Saved. Pages use the new list on their next refresh.</span>{{/if}}
+        </div>
+      </div>
+    </form>
+  </section>
+  <script>document.querySelector('[data-sites-all]')?.addEventListener('click',()=>document.querySelectorAll('.su-sites input').forEach(i=>i.checked=true))</script>
+  <style>
+    .su-sites { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 16px; }
+    .su-sites label { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 2px; cursor: pointer; min-height: 40px; }
+    .su-sites label:hover { background: var(--surface-2); }
+    .su-sites input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+    .su-sites .nm { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .su-sites .tx { display: grid; min-width: 0; flex: 1; line-height: 1.3; }
+    .su-sites .faint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  </style>
+  {{/if}}
+
   <section class="su-ai" id="ai" aria-labelledby="aiH">
     <div class="su-head">
       <div>

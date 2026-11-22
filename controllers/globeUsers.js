@@ -2,6 +2,7 @@
    No I/O here so mocha can test it without GA4 credentials. */
 
 const tzLookup = require("tz-lookup");
+const { nextDailyReset } = require("../lib/quotaLedger");
 
 const NOT_SET = "(not set)";
 const FEED_MAX = 40;
@@ -202,7 +203,7 @@ function projectBucket(q) {
  * @param {Map<string, object>} quotas propertyId -> propertyQuota
  * @param {Map<string, number>} costs propertyId -> tokens one globe poll costs that property
  */
-function refreshInfo(quotas, costs = new Map()) {
+function refreshInfo(quotas, costs = new Map(), now = Date.now()) {
     let busiest = null;
     let autoSec = 0;
     let throttled = false;
@@ -213,7 +214,13 @@ function refreshInfo(quotas, costs = new Map()) {
         if (b.remaining < 0.1 * b.limit) throttled = true;
         const ph = q.tokensPerHour;
         if (ph && qn(ph.remaining) < 0.1 * hourLimit(ph, STD_PROPERTY_HOUR)) throttled = true;
-        autoSec = Math.max(autoSec, autoInterval({ tokensPerPoll: costs.get(id) || 0, remaining: b.remaining }));
+        // Pace by the tightest bucket: our project hour, the property hour (other apps spend it too) and
+        // the day left spread over the hours to the Pacific-midnight reset.
+        const hoursToReset = Math.max(1, (nextDailyReset(now).getTime() - now) / 3600000);
+        const day = q.tokensPerDay ? qn(q.tokensPerDay.remaining) / hoursToReset : Infinity;
+        const remaining = Math.min(b.remaining, ph ? qn(ph.remaining) : Infinity, day);
+        autoSec = Math.max(autoSec, autoInterval({ tokensPerPoll: costs.get(id) || 0, remaining }));
+        if (remaining === day && day < b.remaining) throttled = throttled || day < 0.1 * b.limit;
         if (!busiest || used > busiest.used) busiest = { id, used, limit: b.limit };
     }
     if (!busiest) return null;

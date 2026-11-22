@@ -698,8 +698,28 @@ function adminClient() {
     };
 }
 
+// Demo site icons: two bold shapes crossing on white, one pair of colors per site (index into PROPS)
+const ICON_COLORS = ["#f43f5e", "#f59e0b", "#10b981", "#0ea5e9", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
+const ICON_SHAPES = [
+    (a, b) => `<circle cx="19" cy="21" r="12" fill="${a}"/><rect x="21" y="19" width="17" height="17" fill="${b}" opacity=".85"/>`,
+    (a, b) => `<circle cx="18" cy="24" r="12" fill="${a}"/><circle cx="30" cy="24" r="12" fill="${b}" opacity=".8"/>`,
+    (a, b) => `<rect x="8" y="8" width="20" height="20" fill="${a}"/><rect x="20" y="20" width="20" height="20" fill="${b}" opacity=".8"/>`,
+    (a, b) => `<path d="M8 32 Q24 4 40 32 Z" fill="${a}"/><circle cx="24" cy="32" r="9" fill="${b}" opacity=".8"/>`,
+    (a, b) => `<path d="M6 34 L24 10 L42 34 Z" fill="${a}"/><circle cx="31" cy="22" r="9" fill="${b}" opacity=".8"/>`,
+    (a, b) => `<rect x="8" y="24" width="32" height="14" fill="${b}" opacity=".85"/><circle cx="24" cy="22" r="11" fill="${a}"/>`,
+    (a, b) => `<path d="M6 38 L20 12 L34 38 Z" fill="${a}"/><path d="M18 38 L30 18 L42 38 Z" fill="${b}" opacity=".8"/>`,
+    (a, b) => `<rect x="8" y="10" width="24" height="18" fill="${a}"/><rect x="18" y="20" width="22" height="18" fill="${b}" opacity=".8"/>`,
+];
+function faviconSvg(id) {
+    const i = PROPS.findIndex((p) => p.id === id);
+    if (i < 0) return null;
+    const n = ICON_COLORS.length, shape = ICON_SHAPES[i % ICON_SHAPES.length];
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" fill="#fff"/>${shape(ICON_COLORS[i % n], ICON_COLORS[(i + 3) % n])}</svg>`;
+}
+
 module.exports = {
     enabled,
+    faviconSvg,
     cacheDir,
     dataClient,
     adminClient,

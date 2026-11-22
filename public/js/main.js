@@ -189,7 +189,7 @@ if (document.getElementById('quotaMeters')) {
     const ga = `https://analytics.google.com/analytics/web/#/p${encodeURIComponent(p.propertyId)}/reports/intelligenthome`;
     const report = p.analyticsUrl || `/analytics?prop=${encodeURIComponent(p.propertyId)}`;
     return `<article class="card pc ${p.spike ? 'hot' : ''}" data-pid="${escHtmlMain(p.propertyId)}">
-      <div class="top"><div class="site"><b data-privacy>${escHtmlMain(p.siteName)}</b><span data-privacy>${escHtmlMain(domain)}</span></div>${badge}</div>
+      <div class="top"><img class="pc-fav" alt="" src="/api/favicon/${encodeURIComponent(p.propertyId)}" data-privacy><div class="site"><b data-privacy>${escHtmlMain(p.siteName)}</b><span data-privacy>${escHtmlMain(domain)}</span></div>${badge}</div>
       <div class="nums"><div><span class="n num">${nf(p.active)}</span><span class="faint cap">active</span></div><div><span class="n v num">${nf(p.views)}</span><span class="faint cap">views</span></div></div>
       <div class="chart">${areaChart(p.series, { axis: false, w: 260, h: 44 })}</div>
       <div class="foot">${meter(p)}<span class="num cap ${p.spike ? 'x-hot' : 'muted'}">${xLabel(p)}</span></div>
@@ -200,6 +200,9 @@ if (document.getElementById('quotaMeters')) {
       </div>
     </article>`;
   }
+
+  // ponytail: broken favicon just hides; letter tile like the globe if the gap looks odd
+  document.addEventListener('error', e => { if (e.target.classList?.contains('pc-fav')) e.target.hidden = true; }, true);
 
   function spikeBanner(p) {
     const why = reasons[p.propertyId] || `Usual ${p.baselineKind === 'same-hour' ? 'for this hour' : 'busiest half hour'}: ${nf(p.baseline)} users.`;

@@ -9,6 +9,9 @@ router.post('/api/refresh-cache', apiController.refreshCache);
 
 /** 3D globe page */
 router.get('/globe', apiController.globeView);
+router.get('/tv', apiController.tvView);
+router.get('/api/site-selection', apiController.siteSelectionGet);
+router.post('/api/site-selection', apiController.siteSelectionSave);
 
 /** Country-level realtime data for the globe (JSON) */
 router.get('/api/globe-data', apiController.globeData);

@@ -10,6 +10,7 @@ const {
 } = require("./analyticsRecipes");
 const { runSafeHistoricalReport, runSafeRealtimeReport, getGA4DataClient, getGA4AdminClient } = require("./ga4Service");
 const demo = require("./demoData");
+const siteSelection = require("../lib/siteSelection");
 const { stripSensitiveGlobeUsersPayload } = require("./privacy");
 const { buildGlobeUsersPayload, refreshInfo } = require("./globeUsers");
 const { getFavicon } = require("./favicons");
@@ -216,7 +217,13 @@ let propertiesInFlight = null;
  * A failed fetch falls back to the stale cache. One fetch at a time, shared by concurrent callers.
  * Returns { properties, source: "cached" | "fetched" | "stale" | "none" }.
  */
-exports.ensureProperties = async function ensureProperties({ refreshStale = false, force = false } = {}) {
+/** Same as ensureAllProperties, filtered to the sites the owner picked (lib/siteSelection.js). all: true skips the filter. */
+exports.ensureProperties = async function ensureProperties({ all = false, ...opts } = {}) {
+    const r = await ensureAllProperties(opts);
+    return all ? r : { ...r, properties: siteSelection.filter(r.properties) };
+};
+
+async function ensureAllProperties({ refreshStale = false, force = false } = {}) {
     const cache = await getCachedProperties();
     const missing = !cache?.properties?.length;
     if (!force && !missing && !(refreshStale && isCacheStale(cache))) {
@@ -231,7 +238,7 @@ exports.ensureProperties = async function ensureProperties({ refreshStale = fals
         console.error("[cache] Properties refresh failed" + (missing ? "" : ", using stale cache") + ":", err.message);
         return { properties: cache?.properties ?? [], source: missing ? "none" : "stale" };
     }
-};
+}
 
 const loadProperties = async () => (await exports.ensureProperties()).properties;
 
@@ -484,7 +491,8 @@ exports.realtimeAllApi = async (req, res) => {
         const memAge = Date.now() - realtimeMemCachedAt;
 
         if (realtimeMemCache && memAge < REALTIME_MEM_TTL) {
-            return res.json({ ok: true, cached: true, ...realtimeMemCache });
+            const ids = new Set(properties.map((p) => String(p.id))); // the site choice may be newer than the cache
+            return res.json({ ok: true, cached: true, ...realtimeMemCache, data: (realtimeMemCache.data || []).filter((d) => ids.has(String(d.propertyId))) });
         }
 
         const fetchStart = Date.now();
@@ -507,7 +515,11 @@ exports.favicon = async (req, res) => {
     const cache = await getCachedProperties();
     const prop = cache?.properties?.find((p) => p.id === id);
     if (!prop) return res.sendStatus(404);
-    // Demo sites are fictional: always the letter tile, never a remote fetch
+    // Demo sites are fictional: built-in abstract icons, never a remote fetch
+    if (demo.enabled()) {
+        const svg = demo.faviconSvg(id);
+        if (svg) return res.set({ "Cache-Control": "max-age=3600", "X-Content-Type-Options": "nosniff" }).type("image/svg+xml").send(svg);
+    }
     const file = demo.enabled() ? null : await getFavicon(id, prop.url).catch(() => null);
     if (!file) {
         // No icon found: same letter tile the client draws, so the <img> never errors.
@@ -914,6 +926,29 @@ exports.globeView = (req, res) => {
             url: "",
         },
     });
+};
+
+/** GET /api/site-selection: every GA4 property with selected/isNew. POST: save { selected: [ids] } (form or JSON). */
+exports.siteSelectionGet = async (req, res) => {
+    const { properties, source } = await exports.ensureProperties({ all: true });
+    res.set("Cache-Control", "no-store").json({ ok: true, source, saved: !!siteSelection.read(), properties: siteSelection.annotate(properties) });
+};
+exports.siteSelectionSave = async (req, res) => {
+    const { properties } = await exports.ensureProperties({ all: true });
+    const raw = req.body?.selected ?? [];
+    const data = siteSelection.save(Array.isArray(raw) ? raw : [raw], properties);
+    // Drop the realtime and globe caches so the next poll uses the new list.
+    // ponytail: the spike cache keeps the old list until its TTL; filter it too if that shows up.
+    realtimeMemCache = null; realtimeMemCachedAt = 0;
+    await Promise.all([REALTIME_DISK_PATH, GLOBE_USERS_CACHE_PATH].map((f) => fs.unlink(f).catch(() => {})));
+    if (req.is("application/json")) return res.json({ ok: true, ...data });
+    res.redirect(303, "/setup?saved=sites#sites");
+};
+
+/** GET /tv: full-screen TV board (?layout=rotate|split|board). No navbar, reads the same cached APIs as /globe. */
+exports.tvView = (req, res) => {
+    const layout = ["rotate", "split", "board"].includes(req.query.layout) ? req.query.layout : "split";
+    res.render("tv", { layout: false, tvLayout: layout, demo: demo.enabled() });
 };
 
 // ---------------------------------------------------------------------------

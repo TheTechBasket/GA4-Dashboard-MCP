@@ -224,6 +224,9 @@
   }
 </style>
 
+{{!-- /globe?tv=1: map only, for the /tv board iframe --}}
+<script>if(/[?&]tv=1/.test(location.search)){document.documentElement.classList.add('tv');document.documentElement.setAttribute('data-theme','dark')}</script>
+<style>html.tv #appNav, html.tv .gsum, html.tv .gbr, html.tv .grf, html.tv footer { display: none !important; } html.tv .gstage { inset: 0; }</style>
 <div id="gstage" class="gstage">
   <div class="gmap" id="gmap" role="img" aria-label="Map of live visitors"></div>
   <div class="attr" id="gattr" hidden>&copy; <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>

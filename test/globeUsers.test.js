@@ -91,6 +91,17 @@ describe("globe auto refresh interval", () => {
     expect(r).to.include({ perHour: 14000, usedThisHour: 2000, throttled: false });
     expect(r.perHour).to.not.equal(40000);
   });
+  it("slows down when other apps drain the property hour or the day", () => {
+    const ours = { tokensPerProjectPerHour: { consumed: 40, remaining: 13000 } };
+    const base = refreshInfo(new Map([["a", ours]]), new Map([["a", 40]])).autoSec; // 45 s
+    // Property hour: another app left 2,000 of 40,000. ceil(3600*40/500) = 288 -> 300 s.
+    const hour = refreshInfo(new Map([["a", { ...ours, tokensPerHour: { consumed: 40, remaining: 2000 } }]]), new Map([["a", 40]]));
+    expect(hour.autoSec).to.be.above(base).and.equal(300);
+    // Day: 6,000 left with 10 h to the reset -> 600 an hour -> slower than the 13,000 project hour.
+    const now = Date.UTC(2026, 10, 22, 22, 0); // 14:00 PST, reset at 08:00 UTC next day = 10 h
+    const day = refreshInfo(new Map([["a", { ...ours, tokensPerDay: { consumed: 40, remaining: 6000 } }]]), new Map([["a", 40]]), now);
+    expect(day.autoSec).to.be.above(base);
+  });
 });
 
 describe("globe clusterMarks", () => {

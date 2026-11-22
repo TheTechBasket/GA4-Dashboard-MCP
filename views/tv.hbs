@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+{{! TV board (/tv). Full screen, no navbar, read from across a room. Layouts: rotate (scenes take turns),
+    split (globe stays, side panel rotates), board (everything at once, no globe: light for TV sticks).
+    Data: the same cached /api endpoints as /globe, polled at the quota-safe interval the server sends. }}
+<html lang="en" data-theme="dark" data-layout="{{tvLayout}}">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GA4 Dashboard · TV</title>
+<link rel="icon" type="image/png" href="/logo.png" />
+<link rel="preload" href="/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="/css/panel.css" />
+<script>try{var t=new URLSearchParams(location.search).get('theme');if(t==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
+<style>
+  /* One type scale for the whole screen: 1rem is about 26px on a 1080p TV, 17px on a 720p one. */
+  html { font-size: clamp(14px, calc(1.15vw + .35vh), 52px); background: var(--bg); color: var(--text); }
+  body { margin: 0; font: 400 1rem/1.4 var(--font); overflow: hidden; -webkit-font-smoothing: antialiased; }
+  ::selection { background: var(--accent-soft); color: var(--text); }
+  .num { font-variant-numeric: tabular-nums; }
+  body.idle, body.idle * { cursor: none !important; }
+
+  #tv { position: fixed; inset: 0; display: grid; grid-template-rows: 1fr auto; transition: translate 2s var(--ease-out); }
+  .stage { position: relative; min-height: 0; display: grid; }
+  .scene { min-height: 0; min-width: 0; padding: 2.2rem 2.6rem 1.2rem; display: flex; flex-direction: column; gap: 1.2rem; }
+  .scene h2 { margin: 0; font-size: 1.15rem; font-weight: 600; letter-spacing: -.011em; color: var(--text-2); }
+  .scene[hidden] { display: none; }
+
+  /* rotate: scenes stack, one visible */
+  [data-layout="rotate"] .scene { grid-area: 1 / 1; opacity: 0; transition: opacity .6s var(--ease-out); }
+  [data-layout="rotate"] .scene.on { opacity: 1; }
+  [data-layout="rotate"] .hero { display: none; }
+
+  /* split: globe left, rail right with the live number on top and one rotating panel */
+  [data-layout="split"] .stage { grid-template-columns: 1fr minmax(0, 34rem); grid-template-rows: auto 1fr; }
+  [data-layout="split"] .scene[data-scene="globe"] { grid-area: 1 / 1 / 3 / 2; padding: 0; }
+  [data-layout="split"] .hero { grid-area: 1 / 2; background: var(--surface); padding: 2rem 2.2rem 1rem; }
+  [data-layout="split"] .scene:not([data-scene="globe"]) { grid-area: 2 / 2; background: var(--surface); opacity: 0; transition: opacity .6s var(--ease-out); padding-top: .8rem; }
+  [data-layout="split"] .scene.on:not([data-scene="globe"]) { opacity: 1; }
+  [data-layout="split"] .gover { display: none; }
+
+  /* board: no rotation, three columns, spike banner on top when one is live */
+  [data-layout="board"] .stage { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1.1fr); grid-template-rows: auto auto 1fr; column-gap: .6rem; }
+  [data-layout="board"] .scene[data-scene="globe"] { display: none; }
+  [data-layout="board"] .hero { grid-area: 1 / 1 / 2 / 4; padding: 2rem 2.6rem .4rem; display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: baseline; gap: 1.2rem; }
+  [data-layout="board"] .scene[data-scene="spike"] { grid-area: 2 / 1 / 3 / 4; padding-top: .6rem; padding-bottom: .6rem; }
+  [data-layout="board"] .scene[data-scene="sites"] { grid-area: 3 / 1; background: var(--surface); }
+  [data-layout="board"] .scene[data-scene="countries"] { grid-area: 3 / 2; background: var(--surface); }
+  [data-layout="board"] .scene[data-scene="feed"] { grid-area: 3 / 3; background: var(--surface); }
+  [data-layout="board"] .spike-big { font-size: 2.4rem; }
+
+  /* live number (split and board) */
+  .hero .lbl { color: var(--text-2); font-size: 1rem; font-weight: 500; display: flex; align-items: center; gap: .5rem; }
+  .hero b { display: block; font-size: 5.2rem; font-weight: 600; letter-spacing: -.03em; line-height: 1; }
+  [data-layout="board"] .hero b { font-size: 4.2rem; }
+  .dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--good); flex: none; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  /* globe scene */
+  .scene[data-scene="globe"] { padding: 0; position: relative; }
+  .scene iframe { border: 0; width: 100%; height: 100%; display: block; background: var(--bg); }
+  .gover { position: absolute; left: 2.6rem; top: 2.2rem; pointer-events: none; }
+  .gover b { display: block; font-size: 6rem; font-weight: 600; letter-spacing: -.03em; line-height: 1; text-shadow: 0 2px 18px rgba(0,0,0,.45); }
+  .gover span { font-size: 1.15rem; color: var(--text-2); font-weight: 500; }
+
+  /* rows: sites, countries */
+  .rows { list-style: none; margin: 0; padding: 0; display: grid; gap: .9rem; align-content: start; min-height: 0; overflow: hidden; }
+  .row { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: .8rem; row-gap: .35rem; align-items: center; }
+  .row img, .row .tile { width: 1.6rem; height: 1.6rem; border-radius: 2px; grid-row: 1 / 3; object-fit: cover; }
+  .row .tile { display: grid; place-items: center; font-size: .8rem; font-weight: 600; color: #fff; }
+  .row .nm { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .ct { font-weight: 600; font-size: 1.2rem; text-align: right; }
+  .row .bar { grid-column: 2 / 4; height: .3rem; background: var(--surface-3); border-radius: 1px; overflow: hidden; }
+  .row .bar i { display: block; height: 100%; background: var(--accent-fg); transform-origin: left; transition: transform .8s var(--ease-out); }
+  .row .meta { display: flex; gap: .7rem; align-items: center; justify-content: end; }
+  .row svg { width: 5rem; height: 1.3rem; overflow: visible; }
+  .row svg polyline { fill: none; stroke: var(--text-3); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .dl { font-size: .8rem; font-weight: 600; padding: .05rem .35rem; border-radius: 2px; background: var(--surface-3); color: var(--text-2); }
+  .dl.up { background: var(--good-soft); color: var(--good); }
+  .dl.dn { background: var(--warn-soft); color: var(--warn); }
+  [data-layout="rotate"] .rows { gap: 1.2rem; font-size: 1.15rem; max-width: 64rem; }
+  [data-layout="rotate"] .row svg { width: 8rem; height: 1.8rem; }
+
+  /* feed */
+  .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; align-content: start; min-height: 0; overflow: hidden; }
+  .feed li { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto; column-gap: .8rem; align-items: start; animation: in .6s var(--ease-out) both; }
+  .feed img, .feed .noflag { width: 1.6rem; height: 1.2rem; border-radius: 2px; margin-top: .2rem; object-fit: cover; background: var(--surface-3); }
+  .feed .pg { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .feed .sub { color: var(--text-2); font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .feed .ago { color: var(--text-3); font-size: .85rem; }
+  .feed .key .pg::after { content: "Key event"; margin-left: .5rem; font-size: .7rem; font-weight: 600; padding: .05rem .35rem; border-radius: 2px; background: var(--accent-soft); color: var(--accent-fg); vertical-align: .15em; }
+  [data-layout="rotate"] .feed { font-size: 1.15rem; gap: 1rem; max-width: 70rem; }
+  @keyframes in { from { opacity: 0; translate: 0 -.4rem; } }
+
+  /* spike */
+  .spike-big { font-size: 3.6rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.05; margin: 0; }
+  .spike-big em { font-style: normal; color: var(--warn); }
+  .spike-sub { color: var(--text-2); font-size: 1.15rem; margin: 0; }
+  .refs { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0; padding: 0; list-style: none; }
+  .refs li { background: var(--surface-2); padding: .3rem .7rem; border-radius: 2px; font-size: .95rem; }
+  .refs b { margin-left: .4rem; }
+  [data-layout="board"] .spike-row { display: flex; align-items: baseline; gap: 1.6rem; flex-wrap: wrap; }
+
+  /* status bar */
+  .bar-b { display: flex; align-items: center; gap: 1.6rem; padding: .7rem 2.6rem; font-size: .85rem; color: var(--text-2); background: var(--surface); }
+  .bar-b .live { display: flex; align-items: center; gap: .5rem; color: var(--text); font-weight: 600; font-size: 1rem; }
+  [data-layout="rotate"] .bar-b .live { display: flex; } .bar-b .live { display: none; }
+  .steps { display: flex; gap: .4rem; flex: 1; max-width: 18rem; }
+  .steps i { flex: 1; height: .22rem; background: var(--surface-3); border-radius: 1px; overflow: hidden; }
+  .steps i.on::before { content: ""; display: block; height: 100%; background: var(--text-2); transform-origin: left; animation: fill var(--dur, 20s) linear forwards; }
+  .steps.paused i.on::before { animation-play-state: paused; }
+  @keyframes fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  [data-layout="board"] .steps { visibility: hidden; }
+  .quota { display: flex; align-items: center; gap: .6rem; margin-left: auto; }
+  .quota .m { width: 6rem; height: .3rem; background: var(--surface-3); border-radius: 1px; overflow: hidden; }
+  .quota .m i { display: block; height: 100%; background: var(--good); transform-origin: left; transition: transform .8s var(--ease-out); }
+  .quota.low .m i { background: var(--warn); } .quota.low { color: var(--warn); }
+  .clock { font-weight: 600; color: var(--text); font-size: 1rem; }
+  .demo { font-size: .75rem; font-weight: 600; padding: .05rem .4rem; border-radius: 2px; background: var(--warn-soft); color: var(--warn); }
+  .empty { color: var(--text-3); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scene, .row .bar i, .quota .m i, #tv { transition: none !important; }
+    .feed li, .dot { animation: none; }
+  }
+</style>
+</head>
+<body>
+<main id="tv">
+  <section class="stage" id="stage">
+    <div class="hero"><span class="lbl"><span class="dot" aria-hidden="true"></span>Live visitors, last 30 min</span><b class="num" data-total>0</b></div>
+
+    <div class="scene" data-scene="spike" hidden>
+      <h2>Traffic spike</h2>
+      <div id="spike"></div>
+    </div>
+    <div class="scene" data-scene="globe">
+      <iframe id="globeFrame" title="Live visitors on a globe" tabindex="-1"></iframe>
+      <div class="gover"><b class="num" data-total>0</b><span>live visitors, last 30 min</span></div>
+    </div>
+    <div class="scene" data-scene="sites">
+      <h2>Live visitors by site</h2>
+      <ol class="rows" id="sites"><li class="empty">Loading</li></ol>
+    </div>
+    <div class="scene" data-scene="feed">
+      <h2>Happening now</h2>
+      <ul class="feed" id="feed"><li class="empty">Loading</li></ul>
+    </div>
+    <div class="scene" data-scene="countries">
+      <h2>Where visitors are</h2>
+      <ol class="rows" id="countries"><li class="empty">Loading</li></ol>
+    </div>
+  </section>
+
+  <footer class="bar-b">
+    <span class="live"><span class="dot" aria-hidden="true"></span><span class="num" data-total>0</span> live</span>
+    <span class="steps" id="steps" aria-hidden="true"></span>
+    {{#if demo}}<span class="demo">Demo data</span>{{/if}}
+    <span id="fresh" class="num">Loading</span>
+    <span class="quota" id="quota" title="GA4 quota used this hour by the busiest property"><span class="m"><i style="transform:scaleX(0)"></i></span><span class="num" id="quotaTxt"></span></span>
+    <span class="clock num" id="clock"></span>
+  </footer>
+</main>
+<script src="/js/letterTile.js"></script>
+<script src="/js/tv.js"></script>
+</body>
+</html>

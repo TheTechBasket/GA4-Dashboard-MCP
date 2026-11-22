@@ -131,7 +131,10 @@ app.get('/api/setup/status', async (req, res) => {
 	}
 });
 
-app.get('/setup', (req, res) => {
+app.get('/setup', async (req, res) => {
+	// Site picker (#sites): every GA4 property, ticked = shown and fetched. Fails soft before credentials exist.
+	const sites = await require('./controllers/apiController').ensureProperties({ all: true })
+		.then((r) => require('./lib/siteSelection').annotate(r.properties)).catch(() => []);
 	// Docker: the host folder is unknown and pnpm is not there, so show docker commands
 	const docker = !!process.env.IN_DOCKER;
 	const mcp = docker
@@ -150,6 +153,10 @@ app.get('/setup', (req, res) => {
 		projectDir: __dirname,
 		docker,
 		dockerImage: DOCKER_IMAGE,
+		sites,
+		sitesNew: sites.filter((x) => x.isNew).length,
+		sitesOn: sites.filter((x) => x.selected).length,
+		sitesSaved: req.query.saved === 'sites',
 	});
 });
 
