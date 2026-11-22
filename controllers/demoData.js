@@ -490,7 +490,9 @@ function toResponse(p, atoms, dims, metrics, req) {
 /** Base metrics for `s` sessions in one combination of entities */
 function sessionMetrics(p, s, a) {
     const bot = a.geo?.bot;
-    const engRate = Math.min(0.95, p.eng * (a.src?.eng || 1) * (a.dev?.eng || 1)) * (bot ? 0.03 : 1);
+    // ponytail: page factor averages ~1, so totals grouped by page can differ from ungrouped by a few percent
+    const pageEng = a.page ? 0.82 + 0.36 * unit(`${p.id}:peng:${a.page.path}`) : 1;
+    const engRate = Math.min(0.95, p.eng * (a.src?.eng || 1) * (a.dev?.eng || 1) * pageEng) * (bot ? 0.03 : 1);
     const dur = p.avgEng * (a.src?.dur || 1) * (bot ? 0.01 : 1);
     const users = s * 0.8;
     const newShare = a.vis ? (a.vis === "new" ? 1 : 0) : p.newShare;
@@ -529,6 +531,8 @@ function weighted(list, p, group, periodKey, boost = () => 1) {
     return list.map((e, i) => ({ e, w: ws[i] / s }));
 }
 
+const SURGE_SOURCES = [["reddit.com", 0.72], ["google", 0.22], ["(direct)", 0.06]];
+
 function runReport(req) {
     const id = String(req.property || "").split("/").pop();
     const p = PROP_BY_ID.get(id);
@@ -543,7 +547,6 @@ function runReport(req) {
     const start = resolveDate(range.startDate, todayNum);
     const end = Math.min(todayNum, resolveDate(range.endDate, todayNum));
     const periodKey = `${start}-${end}`;
-    const nDays = Math.max(1, end - start + 1);
 
     const names = new Set([...dims.map((d) => d.name), ...filterFields(req.dimensionFilter)]);
     const need = new Set([...names].map((n) => DIM_GROUP[n]).filter(Boolean));
@@ -555,46 +558,53 @@ function runReport(req) {
         const ymd = ymdOf(n);
         const day = daySessions(p, ymd, todayNum);
         const lastHour = n === todayNum ? nowHour : 23;
-        if (byHour) {
-            for (let h = 0; h <= lastHour; h++) {
-                const spike = p.spike && n === todayNum && h >= nowHour - 1 ? p.spike : 1;
-                slots.push({ ymd, hour: h, s: day * hourShare(p, ymd, h) * spike });
-            }
-        } else {
-            let share = 1;
-            if (n === todayNum) { share = 0; for (let h = 0; h <= nowHour; h++) share += hourShare(p, ymd, h); }
-            slots.push({ ymd, s: day * share * (p.spike && n === todayNum ? 1.3 : 1) });
+        const hours = [];
+        for (let h = 0; h <= lastHour; h++) {
+            const base = day * hourShare(p, ymd, h);
+            // Today's surge: extra sessions in the last two hours, kept apart so every report counts them the same way
+            hours.push({ ymd, hour: h, s: base, surge: p.spike && n === todayNum && h >= nowHour - 1 ? base * (p.spike - 1) : 0 });
         }
+        if (byHour) slots.push(...hours);
+        else slots.push({ ymd, s: hours.reduce((a, x) => a + x.s, 0), surge: hours.reduce((a, x) => a + x.surge, 0) });
     }
-    const timeSlots = need.has("time") ? slots : [{ ymd: ymdOf(end), s: slots.reduce((a, x) => a + x.s, 0) }];
+    const timeSlots = need.has("time") ? slots
+        : [{ ymd: ymdOf(end), s: slots.reduce((a, x) => a + x.s, 0), surge: slots.reduce((a, x) => a + x.surge, 0) }];
 
-    // Reddit carries the spike on the spiking property, more so in short ranges that include today
-    const srcBoost = (e) => (p.spike && end === todayNum && e.source === "reddit.com" ? 1 + 10 / nDays : 1);
-    const pageBoost = (e) => (p.viral && end === todayNum && e.path === p.viral ? 1 + 6 / nDays : 1);
     const lists = {
         geo: weighted(p.geo, p, "geo", periodKey),
-        src: weighted(p.sources, p, "src", periodKey, srcBoost),
-        page: weighted(p.pages, p, "page", periodKey, pageBoost),
+        src: weighted(p.sources, p, "src", periodKey),
+        page: weighted(p.pages, p, "page", periodKey),
         dev: weighted(p.devices, p, "dev", periodKey),
         vis: [{ e: "new", w: p.newShare }, { e: "returning", w: 1 - p.newShare }],
         evt: p.events.map((e) => ({ e, w: 1 })),
     };
 
     // Cartesian product of the needed entity groups
-    let combos = [{ a: {}, w: 1 }];
-    for (const g of ["geo", "src", "page", "dev", "vis", "evt"]) {
-        if (!need.has(g)) continue;
-        const next = [];
-        for (const c of combos) for (const { e, w } of lists[g]) next.push({ a: { ...c.a, [g]: e }, w: c.w * w });
-        combos = next;
-    }
+    const product = (groups, start) => {
+        let combos = start;
+        for (const g of groups) {
+            if (!need.has(g)) continue;
+            const next = [];
+            for (const c of combos) for (const { e, w } of lists[g]) next.push({ a: { ...c.a, [g]: e }, w: c.w * w });
+            combos = next;
+        }
+        return combos;
+    };
+    const combos = product(["geo", "src", "page", "dev", "vis", "evt"], [{ a: {}, w: 1 }]);
+    // Surge sessions all land on the viral page, mostly from the Reddit thread
+    const viral = p.pages.find((e) => e.path === p.viral);
+    const surgeStart = SURGE_SOURCES.map(([src, w]) => ({ a: { src: p.sources.find((e) => e.source === src), page: viral }, w }));
+    const surgeCombos = viral ? product(["geo", "dev", "vis", "evt"], surgeStart) : [];
 
     const atoms = [];
     for (const t of timeSlots) {
-        for (const c of combos) {
-            const a = { ...c.a, ymd: t.ymd, hour: t.hour };
-            a.m = sessionMetrics(p, t.s * c.w, a);
-            atoms.push(a);
+        for (const [list, total] of [[combos, t.s], [surgeCombos, t.surge]]) {
+            if (!total) continue;
+            for (const c of list) {
+                const a = { ...c.a, ymd: t.ymd, hour: t.hour };
+                a.m = sessionMetrics(p, total * c.w, a);
+                atoms.push(a);
+            }
         }
     }
     return toResponse(p, atoms, dims, metrics, req);
