@@ -53,6 +53,8 @@ if (process.env.NODE_ENV === 'development') {
 
 // Static Files
 app.use(express.static('public'));
+// GridStack (drag and resize widget tiles on /tv), served from node_modules so pnpm owns the version
+app.use('/vendor/gridstack', express.static(path.join(__dirname, 'node_modules', 'gridstack', 'dist')));
 
 
 // logging middleware

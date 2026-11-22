@@ -34,6 +34,7 @@
     "express": "^5.2.1",
     "express-handlebars": "^8.0.7",
     "google-auth-library": "^10.9.1",
+    "gridstack": "14.1.1",
     "tz-lookup": "^6.1.25",
     "zod": "^3.25.76"
   },
