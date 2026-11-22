@@ -3,6 +3,27 @@
 All notable changes to this project are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [2.2.0] - 2026-11-22
+
+### Added
+
+- TV board at `/tv`: a full-screen page for a wall screen. Tiles can be moved and resized (press E), several widgets can share one tile and take turns, and the layout is saved. The Edit button and quota meter hide after 3 s without mouse movement; a low quota stays visible.
+- Site picker: choose which GA4 properties the dashboard shows. New properties stay hidden until you tick them.
+- `/sites` report for all properties, with AdSense earnings from the www and bare host added together.
+- `DEMO=1` for the MCP server: it answers from the 8 demo sites, so you can try it without a GA4 key.
+- Daily GA4 sessions snapshot script.
+
+### Changed
+
+- Auto refresh paces itself by the property-hour and daily quota, not only the project-hour quota.
+- GA4 calls pause after rate-limit and server errors.
+- Demo data: the traffic spike has its own sessions, and engagement is set per page.
+- Tests and docs use example domains and property IDs.
+
+### Security
+
+- Express stack and other dependencies upgraded to clear audit and Dependabot findings.
+
 ## [2.1.0] - 2026-10-12
 
 ### Added
