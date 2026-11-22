@@ -3,6 +3,12 @@
 All notable changes to this project are listed here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [2.2.1] - 2026-11-22
+
+### Fixed
+
+- Docker image: amd64 and arm64 now build on native runners. The 2.2.0 arm64 build crashed under emulation, so 2.2.0 has no image. Use 2.2.1 for every change listed under 2.2.0.
+
 ## [2.2.0] - 2026-11-22
 
 ### Added
