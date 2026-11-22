@@ -219,7 +219,7 @@ const PROPS = [
     },
     {
         id: "311000107", site: "Trailhead Gear Notes", domain: "trailhead-gear.example", tz: "Australia/Sydney", currency: "AUD",
-        daily: 950, growth: -0.003, home: { AU: 8, US: 1.5, GB: 1.2 }, eng: 0.61, avgEng: 102, pvps: 2.4, newShare: 0.67, ads: 4,
+        daily: 950, growth: -0.003, quietDrop: 6, home: { AU: 8, US: 1.5, GB: 1.2 }, eng: 0.61, avgEng: 102, pvps: 2.4, newShare: 0.67, ads: 4,
         events: [["affiliate_click", 0.07, 0.06, 0, true]],
         pages: [
             ["/", "Trailhead Gear Notes | Honest gear tests", 14],
@@ -287,7 +287,9 @@ function daySessions(p, ymd, todayNum) {
     const noise = 0.9 + 0.2 * unit(`${p.id}:day:${ymd}`);
     // One older Reddit bump on the spiking property, so the trend line has history too
     const bump = p.spike && ago === 12 ? 1.9 : p.spike && ago === 11 ? 1.3 : 1;
-    return p.daily * 1.25 * WEEKDAY[dow] * Math.exp(-p.growth * ago) * noise * bump;
+    // A quiet week-over-week drop on one property, so /sites has a "Needs a look" row
+    const drop = p.quietDrop && ago >= 1 && ago <= p.quietDrop ? 0.6 : 1;
+    return p.daily * 1.25 * WEEKDAY[dow] * Math.exp(-p.growth * ago) * noise * bump * drop;
 }
 
 function hourShare(p, ymd, hour) {

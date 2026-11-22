@@ -25,9 +25,28 @@ function hostOf(url) {
 }
 
 /** Snapshot plus AdSense days attached per property (matched by web stream host). */
+/** Same 14-day request as scripts/snapshot-sessions.js, answered by the demo data client. */
+async function demoSnapshot() {
+    const client = demo.dataClient();
+    const properties = await Promise.all(demo.PROPERTIES.map(async (p) => {
+        const [res] = await client.runReport({
+            property: `properties/${p.id}`,
+            dateRanges: [{ startDate: "14daysAgo", endDate: "yesterday" }],
+            dimensions: [{ name: "date" }],
+            metrics: [{ name: "sessions" }],
+            orderBys: [{ dimension: { dimensionName: "date" } }],
+            limit: 20,
+        });
+        const daily = {};
+        for (const row of res.rows || []) daily[row.dimensionValues[0].value] = Number(row.metricValues[0].value);
+        return { id: p.id, name: p.site, daily };
+    }));
+    return { generatedAt: new Date().toISOString(), properties };
+}
+
 async function loadSitesSnapshot() {
-    // Demo mode never shows the real snapshot (screenshots of a public demo).
-    if (demo.enabled()) return { snapshot: null, adsense: null };
+    // Demo mode never shows the real snapshot (screenshots of a public demo): it builds one from the demo client.
+    if (demo.enabled()) return { snapshot: await demoSnapshot(), adsense: null };
     const [snap, ads] = await Promise.all([
         readJson(path.join(SNAP_DIR, "latest.json")),
         readJson(path.join(SNAP_DIR, "adsense-latest.json")),
