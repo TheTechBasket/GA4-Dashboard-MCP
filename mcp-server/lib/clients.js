@@ -1,10 +1,14 @@
 const { getAuthOptions } = require("./auth");
+// DEMO=1: the app's fake clients (8 .example sites), so the server runs with no Google account.
+// ponytail: no demo funnel; runFunnelReport fails in demo mode.
+const demo = require("../../controllers/demoData");
 
 let adminClient = null;
 let dataClient = null;
 let alphaDataClient = null;
 
 function getAdminClient() {
+	if (!adminClient && demo.enabled()) adminClient = demo.adminClient();
 	if (!adminClient) {
 		const { AnalyticsAdminServiceClient } = require("@google-analytics/admin");
 		adminClient = new AnalyticsAdminServiceClient(getAuthOptions());
@@ -13,6 +17,7 @@ function getAdminClient() {
 }
 
 function getDataClient() {
+	if (!dataClient && demo.enabled()) dataClient = demo.dataClient();
 	if (!dataClient) {
 		const { BetaAnalyticsDataClient } = require("@google-analytics/data");
 		dataClient = new BetaAnalyticsDataClient(getAuthOptions());

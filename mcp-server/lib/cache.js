@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const CACHE_DIR = path.join(__dirname, "..", ".cache");
+const CACHE_DIR = require("../../controllers/demoData").cacheDir(path.join(__dirname, "..", ".cache"));
 
 // TTL tiers — historical data barely changes, realtime data changes every minute.
 const TTL_SECONDS = {

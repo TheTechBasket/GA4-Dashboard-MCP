@@ -25,6 +25,12 @@ have it in every project. No `-e` flags are needed: the server loads
 `claude mcp list` should show `ga4` as Connected. Tools appear in a session
 after a restart.
 
+No Google account yet? Register it with `-e DEMO=1`
+(`claude mcp add ga4 -e DEMO=1 -- node <path>/mcp-server/index.js`). Account,
+property, realtime and report tools then answer from the same 8 made-up sites
+as `pnpm demo`, with no key. Funnel, PageSpeed and indexing tools need real
+credentials. Demo cache and quota files stay apart from the real ones.
+
 ## Credentials
 
 The private key lives only in the root `.env` (gitignored). The MCP client

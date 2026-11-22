@@ -685,6 +685,10 @@ function adminClient() {
     });
     return {
         async listAccounts() { return [[{ name: "accounts/2900001", displayName: "Demo workspace" }]]; },
+        async listAccountSummaries() {
+            return [[{ account: "accounts/2900001", displayName: "Demo workspace",
+                propertySummaries: PROPS.map((p) => ({ property: `properties/${p.id}`, displayName: p.site, propertyType: "PROPERTY_TYPE_ORDINARY" })) }]];
+        },
         async listProperties() { return [PROPS.map(asProperty)]; },
         async listDataStreams({ parent }) {
             const p = PROP_BY_ID.get(String(parent).split("/").pop());

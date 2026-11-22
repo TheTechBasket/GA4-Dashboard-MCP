@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
+// Demo quota never mixes with the real ledger (read at load time, so set before the require below).
+if (require("../controllers/demoData").enabled()) {
+	process.env.QUOTA_LEDGER_FILE ||= require("path").join(__dirname, "..", ".data", "demo", "quota-ledger.json");
+}
 
 const { z } = require("zod");
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
